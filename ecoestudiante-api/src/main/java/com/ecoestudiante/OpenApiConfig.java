@@ -1,0 +1,17 @@
+package com.ecoestudiante;
+
+import io.swagger.v3.oas.models.ExternalDocumentation;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+  @Bean
+  public OpenAPI ecoOpenAPI() {
+    return new OpenAPI()
+      .info(new Info().title("EcoEstudiante API").version("v1").description("API pública v1"))
+      .externalDocs(new ExternalDocumentation().description("Repositorio").url("https://gitlab.com/tu-grupo/ecoestudiante"));
+  }
+}

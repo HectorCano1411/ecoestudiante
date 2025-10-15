@@ -1,0 +1,44 @@
+# --- Node / Next.js (frontend) ---
+node_modules/
+dist/
+build/
+.out/
+.next/
+.coverage/
+coverage/
+.nx/
+.turbo/
+.vercel/
+.pnpm-store/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# --- Java / Spring Boot (backend) ---
+target/
+.build/
+out/
+*.log
+*.tmp
+*.iml
+.gradle/
+.settings/
+.classpath
+.project
+.factorypath
+# Artefactos comunes
+*.jar
+*.war
+*.ear
+
+# --- Env & locales ---
+.env*
+!.env.example
+
+# --- IDE ---
+.vscode/
+.idea/
+
+# --- SO/Misc ---
+.DS_Store
+*.local
