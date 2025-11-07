@@ -24,6 +24,7 @@ jobs:
           cache-dependency-path: ./ecoestudiante-web/package-lock.json
       
       - name: Install dependencies
+        working-directory: ./ecoestudiante-web
         run: npm ci
       
       - name: Run linter
