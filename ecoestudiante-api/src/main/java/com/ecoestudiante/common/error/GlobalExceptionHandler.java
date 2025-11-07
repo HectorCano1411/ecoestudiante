@@ -45,6 +45,13 @@ public class GlobalExceptionHandler {
     return ResponseEntity.badRequest().body(new ErrorResponse(body));
   }
 
+  @ExceptionHandler(UnauthorizedException.class)
+  public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex) {
+    logger.warn("Unauthorized: {}", ex.getMessage());
+    var body = new ErrorResponse.ErrorBody("UNAUTHORIZED", ex.getMessage(), UUID.randomUUID().toString(), java.util.List.of());
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(body));
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
     String correlationId = UUID.randomUUID().toString();

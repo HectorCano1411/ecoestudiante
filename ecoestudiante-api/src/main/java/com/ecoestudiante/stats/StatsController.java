@@ -1,7 +1,6 @@
 package com.ecoestudiante.stats;
 
-import com.ecoestudiante.auth.JwtUtil;
-import com.ecoestudiante.auth.TokenUtil;
+import com.ecoestudiante.auth.UserContextResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,35 +20,11 @@ public class StatsController {
 
     private static final Logger logger = LoggerFactory.getLogger(StatsController.class);
     private final StatsService statsService;
-    private final JwtUtil jwtUtil;
-    private final TokenUtil tokenUtil;
+    private final UserContextResolver userContextResolver;
 
-    public StatsController(StatsService statsService, JwtUtil jwtUtil, TokenUtil tokenUtil) {
+    public StatsController(StatsService statsService, UserContextResolver userContextResolver) {
         this.statsService = statsService;
-        this.jwtUtil = jwtUtil;
-        this.tokenUtil = tokenUtil;
-    }
-
-    /**
-     * Extrae el userId del token de autenticación (soporta tokens propios y Auth0).
-     */
-    private String getUserIdFromRequest(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new SecurityException("Token no encontrado");
-        }
-        String token = authHeader.substring(7);
-        
-        // Usar TokenUtil para extraer userId (maneja ambos tipos de tokens)
-        String userId = tokenUtil.extractUserId(token);
-        
-        if (userId == null || userId.isBlank()) {
-            logger.warn("No se pudo extraer userId del token");
-            throw new SecurityException("No se pudo extraer userId del token");
-        }
-        
-        logger.debug("UserId extraído del token: {}", userId);
-        return userId;
+        this.userContextResolver = userContextResolver;
     }
 
     @GetMapping("/summary")
@@ -60,7 +35,7 @@ public class StatsController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<StatsDtos.StatsSummary> getSummary(HttpServletRequest request) {
         try {
-            String userId = getUserIdFromRequest(request);
+            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo estadísticas para usuario: {}", userId);
             StatsDtos.StatsSummary summary = statsService.getSummary(userId);
             return ResponseEntity.ok(summary);
@@ -78,7 +53,7 @@ public class StatsController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<StatsDtos.StatsByCategoryResponse> getByCategory(HttpServletRequest request) {
         try {
-            String userId = getUserIdFromRequest(request);
+            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo estadísticas por categoría para usuario: {}", userId);
             StatsDtos.StatsByCategoryResponse response = statsService.getByCategory(userId);
             return ResponseEntity.ok(response);
@@ -105,7 +80,7 @@ public class StatsController {
             @RequestParam(value = "categories", required = false) java.util.List<String> categories
     ) {
         try {
-            String userId = getUserIdFromRequest(request);
+            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo datos temporales para usuario: {}, groupBy: {}, months: {}, schedule: {}, career: {}, month: {}, day: {}, categories: {}", 
                 userId, groupBy, months, schedule, career, month, day, categories);
             StatsDtos.TimeSeriesResponse response = statsService.getTimeSeries(
@@ -126,7 +101,7 @@ public class StatsController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<java.util.List<String>> getAvailableCareers(HttpServletRequest request) {
         try {
-            String userId = getUserIdFromRequest(request);
+            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo carreras disponibles para usuario: {}", userId);
             java.util.List<String> careers = statsService.getAvailableCareers(userId);
             return ResponseEntity.ok(careers);
@@ -144,7 +119,7 @@ public class StatsController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<java.util.Map<String, java.util.List<String>>> getAvailableCategories(HttpServletRequest request) {
         try {
-            String userId = getUserIdFromRequest(request);
+            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo categorías disponibles para usuario: {}", userId);
             java.util.Map<String, java.util.List<String>> categories = statsService.getAvailableCategories(userId);
             return ResponseEntity.ok(categories);

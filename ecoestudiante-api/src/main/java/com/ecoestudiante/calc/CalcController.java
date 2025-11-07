@@ -1,7 +1,7 @@
 package com.ecoestudiante.calc;
 
-import com.ecoestudiante.auth.JwtUtil;
-import com.ecoestudiante.auth.TokenUtil;
+import com.ecoestudiante.auth.UserContext;
+import com.ecoestudiante.auth.UserContextResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,8 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/v1/calc")
 @Tag(name = "Calc", description = "Cálculos de emisiones")
@@ -25,45 +23,11 @@ public class CalcController {
 
   private static final Logger logger = LoggerFactory.getLogger(CalcController.class);
   private final CalcService svc;
-  private final JwtUtil jwtUtil;
-  private final TokenUtil tokenUtil;
+  private final UserContextResolver userContextResolver;
 
-  public CalcController(CalcService svc, JwtUtil jwtUtil, TokenUtil tokenUtil) {
+  public CalcController(CalcService svc, UserContextResolver userContextResolver) {
     this.svc = svc;
-    this.jwtUtil = jwtUtil;
-    this.tokenUtil = tokenUtil;
-  }
-
-  /**
-   * Extrae el userId del token de autenticación (soporta tokens propios y Auth0).
-   */
-  private String getUserIdFromRequest(HttpServletRequest request) {
-    String authHeader = request.getHeader("Authorization");
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      throw new SecurityException("Token no encontrado");
-    }
-    String token = authHeader.substring(7);
-    
-    // Usar TokenUtil para extraer userId (maneja ambos tipos de tokens)
-    String userId = tokenUtil.extractUserId(token);
-    
-    if (userId == null || userId.isBlank()) {
-      logger.warn("No se pudo extraer userId del token");
-      throw new SecurityException("No se pudo extraer userId del token");
-    }
-    
-    logger.debug("UserId extraído del token: {}", userId);
-    return userId;
-  }
-
-  /**
-   * Normaliza userId a UUID válido usando TokenUtil.
-   * Si userId es un UUID válido, lo retorna.
-   * Si userId es un Auth0 sub u otro formato, genera un UUID determinístico basado en el userId.
-   */
-  private String normalizeUserId(String userId) {
-    UUID uuid = tokenUtil.normalizeUserIdToUuid(userId);
-    return uuid.toString();
+    this.userContextResolver = userContextResolver;
   }
 
   @PostMapping(
@@ -101,21 +65,14 @@ public class CalcController {
   ) {
     // Extraer userId del token si no está en el body o está vacío
     String userId = in.userId();
+    String normalizedUserId;
     if (userId == null || userId.isBlank()) {
-      try {
-        userId = getUserIdFromRequest(request);
-        logger.debug("UserId extraído del token: {}", userId);
-      } catch (Exception e) {
-        logger.warn("No se pudo extraer userId del token, usando el del body: {}", e.getMessage());
-        // Si no se puede extraer del token y no hay en el body, lanzar excepción
-        if (userId == null || userId.isBlank()) {
-          throw new SecurityException("Token requerido o inválido");
-        }
-      }
+      UserContext context = userContextResolver.resolve(request);
+      normalizedUserId = context.normalizedUserIdAsString();
+      userId = context.userId();
+    } else {
+      normalizedUserId = userContextResolver.normalizeUserId(userId);
     }
-    
-    // Normalizar userId a UUID (maneja Auth0 sub y otros formatos)
-    String normalizedUserId = normalizeUserId(userId);
     
     // Crear nuevo input con userId normalizado
     var normalized = new CalcDtos.ElectricityInput(
@@ -164,7 +121,8 @@ public class CalcController {
       @Valid @RequestBody CalcDtos.TransportInput in,
       HttpServletRequest request
   ) {
-    String userId = getUserIdFromRequest(request);
+    UserContext context = userContextResolver.resolve(request);
+    String userId = context.normalizedUserIdAsString();
     var normalized = new CalcDtos.TransportInput(
         in.distance(),
         in.transportMode(),
@@ -211,7 +169,8 @@ public class CalcController {
       @RequestParam(value = "pageSize", defaultValue = "20") int pageSize,
       HttpServletRequest request
   ) {
-    String userId = getUserIdFromRequest(request);
+    UserContext context = userContextResolver.resolve(request);
+    String userId = context.normalizedUserIdAsString();
     logger.info("Obteniendo historial para usuario: {}, categoría: {}, página: {}", userId, category, page);
     return svc.getHistory(userId, category, page, pageSize);
   }

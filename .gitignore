@@ -49,3 +49,6 @@ env.local
 
 # --- Scripts ---
 *.sh
+
+# --- Documentación local ---
+Git-Conventions.md
