@@ -1,0 +1,164 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  frontend_lint_test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ecoestudiante-web
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ./ecoestudiante-web/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
+      
+      - name: Run tests
+        run: npm run test:coverage
+        env:
+          AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
+          AUTH0_BASE_URL: ${{ secrets.AUTH0_BASE_URL }}
+          AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+      
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(npm run test:coverage -- --coverage --coverageReporters=text-summary | grep -oP 'All files\s+\|\s+\d+\.\d+%' | grep -oP '\d+\.\d+' | head -1)
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "Coverage $COVERAGE% is below 80% threshold"
+            exit 1
+          fi
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./ecoestudiante-web/coverage/lcov.info
+          flags: frontend
+
+  backend_unit_integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ecoestudiante-gateway
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Run tests
+        run: mvn test
+        env:
+          AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+      
+      - name: Generate coverage report
+        run: mvn jacoco:report
+      
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(mvn jacoco:check | grep -oP 'Total\s+\|\s+\d+%' | grep -oP '\d+' | head -1)
+          if [ "$COVERAGE" -lt 80 ]; then
+            echo "Coverage ${COVERAGE}% is below 80% threshold"
+            exit 1
+          fi
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./ecoestudiante-gateway/target/site/jacoco/jacoco.xml
+          flags: backend
+
+  contract_tests:
+    runs-on: ubuntu-latest
+    needs: [frontend_lint_test]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Step 1: Generar pact files desde el frontend (consumer)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ./ecoestudiante-web/package-lock.json
+      
+      - name: Install frontend dependencies
+        working-directory: ./ecoestudiante-web
+        run: npm ci
+      
+      - name: Run consumer tests (generate pact files)
+        working-directory: ./ecoestudiante-web
+        run: npm run test:contract
+        env:
+          AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
+          AUTH0_BASE_URL: ${{ secrets.AUTH0_BASE_URL }}
+          AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+      
+      - name: Upload pact files
+        uses: actions/upload-artifact@v3
+        with:
+          name: pact-files
+          path: ecoestudiante-web/pacts/*.json
+      
+      # Step 2: Verificar pact files en el gateway (provider)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Download pact files
+        uses: actions/download-artifact@v3
+        with:
+          name: pact-files
+          path: ecoestudiante-gateway/src/test/resources/pacts
+      
+      - name: Run provider tests (verify pacts)
+        working-directory: ./ecoestudiante-gateway
+        run: mvn test -Dtest=ContractTests
+        env:
+          AUTH0_ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+
+  sast_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+          fail_on_error: true
+

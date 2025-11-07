@@ -1,0 +1,63 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ecoestudiante-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: calculo-route
+          uri: http://localhost:18080
+          predicates:
+            - Path=/api/calc/**
+          filters:
+            - StripPrefix=1
+        - id: reportes-route
+          uri: http://localhost:18080
+          predicates:
+            - Path=/api/reportes/**
+          filters:
+            - StripPrefix=1
+        - id: stats-route
+          uri: http://localhost:18080
+          predicates:
+            - Path=/api/stats/**
+          filters:
+            - StripPrefix=1
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH0_ISSUER_BASE_URL:https://dev-xxxxx.us.auth0.com/}
+          audience: ${AUTH0_AUDIENCE:https://api.ecoestudiante.com}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+

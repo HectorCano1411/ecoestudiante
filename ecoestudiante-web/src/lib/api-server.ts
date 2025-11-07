@@ -17,10 +17,32 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
   let preview: any = null;
   try { preview = await clone.json(); } catch { preview = await clone.text(); }
 
-  logger.debug('api-server', '←', res.status, { preview });
-
   if (!res.ok) {
-    throw new Error(`BACKEND ${res.status}: ${res.statusText}`);
+    // Intentar extraer el mensaje de error del body
+    let errorMessage = `${res.status}: ${res.statusText}`;
+    try {
+      const errorBody = await res.clone().json();
+      if (errorBody.message) {
+        errorMessage = errorBody.message;
+      } else if (errorBody.error) {
+        errorMessage = errorBody.error;
+      }
+    } catch {
+      // Si no se puede parsear como JSON, usar el texto
+      try {
+        const errorText = await res.clone().text();
+        if (errorText) {
+          errorMessage = errorText;
+        }
+      } catch {
+        // Mantener el mensaje por defecto
+      }
+    }
+    
+    const error = new Error(`BACKEND ${res.status}: ${errorMessage}`) as any;
+    error.status = res.status;
+    error.response = res;
+    throw error;
   }
   return res.json() as Promise<T>;
 }

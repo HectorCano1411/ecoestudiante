@@ -46,3 +46,6 @@ env.local
 # --- SO/Misc ---
 .DS_Store
 *.local
+
+# --- Scripts ---
+*.sh
