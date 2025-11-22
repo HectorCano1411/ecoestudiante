@@ -115,7 +115,9 @@ export default function AnalyticsPage() {
       
       // Si es una subcategoría (formato: "categoria_subcategoria")
       if (categoryKey.includes('_')) {
-        const [category, subcategory] = categoryKey.split('_');
+        // Desestructurar para separar categoría y subcategoría (no se usan actualmente)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const [_category, _subcategory] = categoryKey.split('_');
         // Buscar en los datos disponibles (esto requeriría datos más detallados del backend)
         // Por ahora, retornamos 0 para subcategorías individuales
         return { totalKgCO2e: 0, recordCount: 0 };

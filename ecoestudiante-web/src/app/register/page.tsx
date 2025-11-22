@@ -2,7 +2,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+// useRouter is not used in this component but may be needed in the future
+// import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import Navbar from "@/components/Navbar";
