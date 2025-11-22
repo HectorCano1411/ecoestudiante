@@ -41,11 +41,13 @@ describe('Proxy Route', () => {
       const data = await response.json();
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/calc/electricity',
+        'http://localhost:18080/api/v1/calc/electricity',
         expect.objectContaining({
           headers: expect.objectContaining({
             'Authorization': 'Bearer mock-token',
+            'Content-Type': 'application/json',
           }),
+          method: 'GET',
         })
       );
       expect(data.result).toBe('success');

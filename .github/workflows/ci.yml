@@ -30,8 +30,8 @@ jobs:
       - name: Run linter
         run: npm run lint
       
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        run: npm run test:coverage
         env:
           AUTH0_SECRET: ${{ secrets.AUTH0_SECRET }}
           AUTH0_BASE_URL: ${{ secrets.AUTH0_BASE_URL }}
@@ -40,21 +40,12 @@ jobs:
           AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
           AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
       
-      # Coverage check desactivado temporalmente hasta tener más tests
-      # - name: Check coverage threshold
-      #   run: |
-      #     COVERAGE=$(npm run test:coverage -- --coverage --coverageReporters=text-summary | grep -oP 'All files\s+\|\s+\d+\.\d+%' | grep -oP '\d+\.\d+' | head -1)
-      #     if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-      #       echo "Coverage $COVERAGE% is below 80% threshold"
-      #       exit 1
-      #     fi
-      
-      # Upload coverage desactivado temporalmente
-      # - name: Upload coverage to Codecov
-      #   uses: codecov/codecov-action@v3
-      #   with:
-      #     files: ./ecoestudiante-web/coverage/lcov.info
-      #     flags: frontend
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./ecoestudiante-web/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
 
   backend_unit_integration:
     runs-on: ubuntu-latest
