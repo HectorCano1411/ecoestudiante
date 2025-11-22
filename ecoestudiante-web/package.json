@@ -7,11 +7,17 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
+    "lint:fix": "eslint --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:contract": "jest --selectProjects contract",
-    "pact:publish": "pact-broker publish ./pacts --consumer-app-version=$npm_package_version --broker-base-url=$PACT_BROKER_BASE_URL"
+    "test:unit": "jest --selectProjects default api-routes",
+    "test:ci": "npm run lint && npm run test:coverage",
+    "test:file": "jest",
+    "pact:publish": "pact-broker publish ./pacts --consumer-app-version=$npm_package_version --broker-base-url=$PACT_BROKER_BASE_URL",
+    "pre-commit": "npm run lint && npm test",
+    "pre-push": "npm run lint && npm run test:coverage"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^3.3.0",
