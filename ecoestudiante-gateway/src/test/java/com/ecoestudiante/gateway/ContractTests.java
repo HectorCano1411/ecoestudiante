@@ -200,9 +200,23 @@ public class ContractTests {
         registry.add("spring.security.oauth2.resourceserver.jwt.audience", () -> "https://api.ecoestudiante.com");
         
         // Configurar el gateway para que apunte al WireMock (backend mock)
+        // Ruta 0: /api/calc/**
+        registry.add("spring.cloud.gateway.routes[0].id", () -> "calculo-route");
         registry.add("spring.cloud.gateway.routes[0].uri", () -> "http://localhost:" + wireMockPort);
+        registry.add("spring.cloud.gateway.routes[0].predicates[0]", () -> "Path=/api/calc/**");
+        registry.add("spring.cloud.gateway.routes[0].filters[0]", () -> "StripPrefix=1");
+        
+        // Ruta 1: /api/reportes/**
+        registry.add("spring.cloud.gateway.routes[1].id", () -> "reportes-route");
         registry.add("spring.cloud.gateway.routes[1].uri", () -> "http://localhost:" + wireMockPort);
+        registry.add("spring.cloud.gateway.routes[1].predicates[0]", () -> "Path=/api/reportes/**");
+        registry.add("spring.cloud.gateway.routes[1].filters[0]", () -> "StripPrefix=1");
+        
+        // Ruta 2: /api/stats/**
+        registry.add("spring.cloud.gateway.routes[2].id", () -> "stats-route");
         registry.add("spring.cloud.gateway.routes[2].uri", () -> "http://localhost:" + wireMockPort);
+        registry.add("spring.cloud.gateway.routes[2].predicates[0]", () -> "Path=/api/stats/**");
+        registry.add("spring.cloud.gateway.routes[2].filters[0]", () -> "StripPrefix=1");
     }
 
     @BeforeEach
