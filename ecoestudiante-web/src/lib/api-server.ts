@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/api-server.ts
 import 'server-only';
 import { logger } from '@/lib/logger';
@@ -16,6 +17,8 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
   const clone = res.clone();
   let preview: any = null;
   try { preview = await clone.json(); } catch { preview = await clone.text(); }
+  // preview is used for logging purposes
+  logger.debug('api-server', 'response preview', preview);
 
   if (!res.ok) {
     // Intentar extraer el mensaje de error del body

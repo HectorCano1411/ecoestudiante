@@ -128,7 +128,7 @@ export default function MobilityMap({
         map.current = null;
       }
     };
-  }, []); // Sin dependencias - solo se ejecuta una vez
+  }, [initialOrigin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Geocodificación inversa
   const geocodeLocation = useCallback(async (lat: number, lng: number): Promise<string | null> => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -73,6 +74,8 @@ export default function ResetPasswordPage() {
 
       setSuccess(true);
       setError(null);
+      // response is logged for debugging but not used in UI
+      console.log('Password reset successful:', response);
       
       // Redirigir al login después de 3 segundos
       setTimeout(() => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { getServerSession, isAuthenticated } from '@/lib/auth';
 
 describe('Auth Helpers', () => {

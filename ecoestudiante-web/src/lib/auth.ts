@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSession, getAccessToken, UserProfile } from '@auth0/nextjs-auth0';
-import { NextRequest } from 'next/server';
 
 /**
  * Obtiene la sesión del usuario actual

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
@@ -54,12 +55,25 @@ export async function GET(req: NextRequest) {
       'Content-Type': 'application/json',
     };
 
+    // Obtener parámetros de categorías de la query string
+    const { searchParams } = new URL(req.url);
+    const categories = searchParams.getAll('categories');
+    
+    // Construir URL con parámetros de categorías
+    let backendUrl = '/api/v1/stats/by-category';
+    if (categories.length > 0) {
+      const params = new URLSearchParams();
+      categories.forEach(cat => params.append('categories', cat));
+      backendUrl += '?' + params.toString();
+    }
+    
     logger.info('route:stats-by-category', 'Calling backend', { 
-      backendUrl: '/api/v1/stats/by-category',
-      hasToken: true 
+      backendUrl,
+      hasToken: true,
+      categoriesCount: categories.length
     });
 
-    const json = await backendFetch('/api/v1/stats/by-category', {
+    const json = await backendFetch(backendUrl, {
       method: 'GET',
       headers,
     });

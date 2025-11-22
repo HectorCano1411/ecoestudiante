@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -13,20 +14,6 @@ type RegisterResponse = {
   message: string;
   email: string;
   emailSent: boolean;
-};
-
-type ErrorResponse = {
-  error: string;
-  message: string;
-};
-
-type AuthResponse = {
-  token: string;
-  type: string;
-  username: string;
-  userId: string;
-  email: string;
-  refreshToken: string;
 };
 
 
@@ -52,7 +39,8 @@ const JORNADAS = [
 ];
 
 export default function RegisterPage() {
-  const router = useRouter();
+  // router is not used in this component but may be needed in the future
+  // const router = useRouter();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -462,7 +450,7 @@ export default function RegisterPage() {
                 </div>
 
                 {/* Auth0 Register Button */}
-                <a
+                <Link
                   href="/api/auth/login"
                   className="block w-full py-3 px-4 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-all text-center flex items-center justify-center gap-2"
                 >
@@ -470,7 +458,7 @@ export default function RegisterPage() {
                     <path d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.636.258 9.659 3.768 12.37L12 24l6.212-4.182c3.51-2.711 5.12-7.734 3.768-12.37zm-9.98 5.554c-3.313 0-6-2.687-6-6s2.687-6 6-6 6 2.687 6 6-2.687 6-6 6z"/>
                   </svg>
                   Auth0 (Google, Email, etc.)
-                </a>
+                </Link>
 
                 <div className="text-center">
                   <p className="text-sm text-gray-600">

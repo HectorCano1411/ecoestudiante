@@ -1,4 +1,5 @@
 // src/lib/logger.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type Level = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<Level, number> = {

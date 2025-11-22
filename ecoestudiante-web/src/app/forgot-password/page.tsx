@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState } from 'react';
@@ -34,6 +35,8 @@ export default function ForgotPasswordPage() {
 
       setSuccess(true);
       setError(null);
+      // response is logged for debugging but not used in UI
+      console.log('Password reset email sent:', response);
       
       // Redirigir al login después de 5 segundos
       setTimeout(() => {

@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { NextRequest } from 'next/server';
-import { GET, POST } from '@/app/api/proxy/calculo/route';
+import { GET } from '@/app/api/proxy/calculo/route';
+// POST is not used in this test file
 
 // Mock de getAccessToken
 jest.mock('@auth0/nextjs-auth0', () => ({

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -313,22 +314,6 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
 
   const requiresFuelType = ['car', 'motorcycle'].includes(transportMode);
   const requiresOccupancy = ['car', 'bus'].includes(transportMode);
-
-  // Función para obtener color según categoría
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'sustainable':
-        return 'bg-green-100 border-green-300 text-green-800';
-      case 'moderate':
-        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'high':
-        return 'bg-orange-50 border-orange-200 text-orange-800';
-      case 'very_high':
-        return 'bg-red-50 border-red-300 text-red-800';
-      default:
-        return 'bg-gray-50 border-gray-200 text-gray-800';
-    }
-  };
 
   // Función para obtener badge de categoría
   const getCategoryBadge = (category: string) => {

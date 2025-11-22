@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
@@ -68,9 +69,9 @@ async function getUserIdFromAuth(req: NextRequest): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const idem = req.headers.get('idempotency-key') ?? `web-${crypto.randomUUID()}`;
-    
+  const body = await req.json();
+  const idem = req.headers.get('idempotency-key') ?? `web-${crypto.randomUUID()}`;
+  
     // Intentar obtener token de Auth0 primero (si el usuario está autenticado con Auth0)
     let authHeader: string | null = null;
     let userId: string | null = body.userId || null;
@@ -95,10 +96,10 @@ export async function POST(req: NextRequest) {
                    req.headers.get('AUTHORIZATION');
     }
     
-    const headers: HeadersInit = { 'Idempotency-Key': idem };
-    
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
+  const headers: HeadersInit = { 'Idempotency-Key': idem };
+  
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
     } else {
       logger.warn('route:electricity', 'No authorization token found');
       return NextResponse.json(
@@ -145,14 +146,14 @@ export async function POST(req: NextRequest) {
       applianceCount: requestBody.selectedAppliances?.length || 0
     });
 
-    const json = await backendFetch('/api/v1/calc/electricity', {
-      method: 'POST',
-      headers,
+  const json = await backendFetch('/api/v1/calc/electricity', {
+    method: 'POST',
+    headers,
       body: JSON.stringify(requestBody),
-    });
+  });
 
     logger.info('route:electricity', 'outcome', { success: true, calcId: json.calcId });
-    return NextResponse.json(json);
+  return NextResponse.json(json);
   } catch (error: any) {
     logger.error('route:electricity', 'error', {
       error: error.message,

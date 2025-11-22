@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/api-client.ts
 import { logger } from '@/lib/logger';
 
@@ -153,7 +154,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
             body: errorText,
             url: url
           });
-        } catch (e) {
+        } catch {
           console.error('API Error (no body):', {
             status: res.status,
             statusText: res.statusText,

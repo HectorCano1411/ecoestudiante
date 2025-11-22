@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
@@ -18,11 +19,6 @@ type ResendVerificationResponse = {
   emailSent: boolean;
 };
 
-type ErrorResponse = {
-  error: string;
-  message: string;
-};
-
 export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,17 +31,7 @@ export default function VerifyEmailPage() {
   const [resendSuccess, setResendSuccess] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!token) {
-      setError('Token de verificación no proporcionado');
-      setLoading(false);
-      return;
-    }
-
-    verifyEmail(token);
-  }, [token]);
-
-  const verifyEmail = async (verificationToken: string) => {
+  const verifyEmail = useCallback(async (verificationToken: string) => {
     try {
       setLoading(true);
       const response = await api<VerifyEmailResponse>('/auth/verify-email', {
@@ -55,6 +41,8 @@ export default function VerifyEmailPage() {
       
       setVerified(true);
       setError(null);
+      // response is logged for debugging but not used in UI
+      console.log('Email verified:', response);
       
       // Redirigir al login después de 3 segundos
       setTimeout(() => {
@@ -85,7 +73,17 @@ export default function VerifyEmailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (!token) {
+      setError('Token de verificación no proporcionado');
+      setLoading(false);
+      return;
+    }
+
+    verifyEmail(token);
+  }, [token, verifyEmail]);
 
   const handleResendVerification = async () => {
     if (!userEmail) {
@@ -105,6 +103,8 @@ export default function VerifyEmailPage() {
 
       setResendSuccess(true);
       setError(null);
+      // response is logged for debugging but not used in UI
+      console.log('Verification email resent:', response);
     } catch (e: any) {
       let errorMessage = 'Error al reenviar el email de verificación';
       

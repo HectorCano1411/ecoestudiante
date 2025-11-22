@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
@@ -54,9 +55,11 @@ export async function GET(req: NextRequest) {
       'Content-Type': 'application/json',
     };
 
+    logger.info('route:stats-available-categories', '=== INICIO LLAMADA AL BACKEND ===');
     logger.info('route:stats-available-categories', 'Calling backend', { 
       backendUrl: '/api/v1/stats/available-categories',
-      hasToken: true 
+      hasToken: true,
+      tokenPrefix: authHeader.substring(0, 20) + '...'
     });
     
     const json = await backendFetch('/api/v1/stats/available-categories', {
@@ -64,6 +67,21 @@ export async function GET(req: NextRequest) {
       headers,
     });
 
+    logger.info('route:stats-available-categories', '=== RESPUESTA DEL BACKEND ===');
+    logger.info('route:stats-available-categories', 'Tipo de respuesta:', typeof json);
+    logger.info('route:stats-available-categories', 'Es objeto?:', json && typeof json === 'object');
+    if (json && typeof json === 'object') {
+      const keys = Object.keys(json);
+      logger.info('route:stats-available-categories', 'Claves en la respuesta:', keys);
+      logger.info('route:stats-available-categories', 'Total categorías:', keys.length);
+      for (const key of keys) {
+        const value = json[key];
+        logger.info('route:stats-available-categories', `  - ${key}:`, Array.isArray(value) ? `${value.length} subcategorías` : typeof value);
+        if (Array.isArray(value) && value.length > 0) {
+          logger.info('route:stats-available-categories', `    Subcategorías:`, value.slice(0, 5));
+        }
+      }
+    }
     logger.info('route:stats-available-categories', 'outcome', { success: true });
     return NextResponse.json(json);
   } catch (error: any) {

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from '@/lib/api-client';
 import type { ElectricityInput, CalcResult } from '@/types/calc';
 
@@ -295,7 +296,7 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
 
       // Obtener userId (puede venir de localStorage para JWT o ser extraído del token por el route handler para Auth0)
       const userId = localStorage.getItem('userId');
-      
+
       // Si no hay userId en localStorage, el route handler lo extraerá del token
       // Esto permite que funcione tanto con JWT tradicional como con Auth0
       const payload: ElectricityInput = {
@@ -343,7 +344,7 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
         {/* Información Personal */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">📚 Información Personal</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Campo Carrera */}
             <div>
               <label htmlFor="career" className="block text-sm font-medium text-gray-700 mb-2">
@@ -367,16 +368,16 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
             </div>
 
             {/* Campo Jornada */}
-            <div>
+          <div>
               <label htmlFor="schedule" className="block text-sm font-medium text-gray-700 mb-2">
                 Jornada <span className="text-red-500">*</span>
-              </label>
+            </label>
               <select
                 id="schedule"
                 value={schedule}
                 onChange={(e) => setSchedule(e.target.value as 'diurna' | 'vespertina')}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                required
+              required
                 disabled={loading}
               >
                 <option value="diurna">Diurna</option>
@@ -408,7 +409,7 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
                 type="button"
                 onClick={deselectAll}
                 className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                disabled={loading}
+              disabled={loading}
               >
                 Deseleccionar Todos
               </button>

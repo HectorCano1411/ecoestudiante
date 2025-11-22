@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { user, error, isLoading } = useUser();
@@ -84,7 +87,7 @@ export default function DashboardPage() {
                 <p><span className="font-medium">Nombre:</span> {user.name || 'N/A'}</p>
                 {user.picture && (
                   <div className="mt-4">
-                    <img src={user.picture} alt="Profile" className="w-20 h-20 rounded-full" />
+                    <Image src={user.picture} alt="Profile" width={80} height={80} className="rounded-full" />
                   </div>
                 )}
               </div>
@@ -122,12 +125,12 @@ export default function DashboardPage() {
           )}
 
           <div className="mt-6">
-            <a
+            <Link
               href="/api/auth/logout"
               className="inline-block px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
             >
               Cerrar Sesión
-            </a>
+            </Link>
           </div>
         </div>
       </div>

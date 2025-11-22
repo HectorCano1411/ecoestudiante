@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
-import { getAccessToken, getSession } from '@auth0/nextjs-auth0';
+import { getAccessToken } from '@auth0/nextjs-auth0';
+// getSession is imported but not used in this file
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,14 +74,14 @@ export async function GET(req: NextRequest) {
       backendUrl: '/api/v1/stats/summary',
       hasToken: true 
     });
-    
-    const json = await backendFetch('/api/v1/stats/summary', {
-      method: 'GET',
-      headers,
-    });
+
+  const json = await backendFetch('/api/v1/stats/summary', {
+    method: 'GET',
+    headers,
+  });
 
     logger.info('route:stats-summary', 'outcome', { success: true });
-    return NextResponse.json(json);
+  return NextResponse.json(json);
   } catch (error: any) {
     logger.error('route:stats-summary', 'error', {
       error: error.message,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import DashboardMenu from '@/components/DashboardMenu';
@@ -48,14 +48,7 @@ export default function DashboardPage() {
     router.push('/login');
   }, [router, auth0User, auth0Loading]);
 
-  useEffect(() => {
-    // Cargar estadísticas cuando se muestra el menú
-    if (activeSection === 'menu' && !loading) {
-      loadStats();
-    }
-  }, [activeSection, loading]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       setLoadingStats(true);
       // Si el usuario está autenticado con Auth0, usar el proxy que incluye el token de Auth0
@@ -74,7 +67,14 @@ export default function DashboardPage() {
     } finally {
       setLoadingStats(false);
     }
-  };
+  }, [authMethod]);
+
+  useEffect(() => {
+    // Cargar estadísticas cuando se muestra el menú
+    if (activeSection === 'menu' && !loading) {
+      loadStats();
+    }
+  }, [activeSection, loading, loadStats]);
 
   const handleLogout = () => {
     if (authMethod === 'auth0') {

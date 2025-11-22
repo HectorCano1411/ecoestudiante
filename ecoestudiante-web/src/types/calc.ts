@@ -42,3 +42,48 @@ export type StatsSummary = {
   averagePerMonth: number;
   calculatedAt: string;
 };
+
+// Tipos para el historial
+export interface FactorInfo {
+  value: number | null;
+  unit: string | null;
+  subcategory: string | null;
+}
+
+export interface CalcHistoryItem {
+  calcId: string;
+  category: string;
+  subcategory: string;
+  input: {
+    // Transporte
+    distance?: number;
+    transportMode?: string;
+    fuelType?: string;
+    occupancy?: number;
+    country?: string;
+    period?: string;
+    originLat?: number;
+    originLng?: number;
+    destinationLat?: number;
+    destinationLng?: number;
+    originAddress?: string;
+    destinationAddress?: string;
+    // Electricidad
+    kwh?: number;
+    selectedAppliances?: string[];
+    career?: string;
+    schedule?: string;
+    // Otros campos comunes
+    [key: string]: any;
+  };
+  kgCO2e: number;
+  factorInfo: FactorInfo | null;
+  createdAt: string;
+}
+
+export interface CalcHistoryResponse {
+  items: CalcHistoryItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}

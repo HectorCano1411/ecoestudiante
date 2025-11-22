@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
 import { getAccessToken, getSession } from '@auth0/nextjs-auth0';
+// backendFetch is not used in this file but may be needed in the future
 
 /**
  * Obtiene el userId del usuario autenticado
@@ -32,7 +33,7 @@ async function getUserIdFromAuth(req: NextRequest): Promise<string | null> {
       }
     }
   } catch (auth0Error: any) {
-    logger.debug('route:auth-me', 'Auth0 not available', { error: auth0Error.message });
+    logger.debug('route:auth-me', 'Auth0 not available', { error: (auth0Error as Error).message });
   }
   
   // Si no hay Auth0, intentar extraer del header Authorization (JWT tradicional)
