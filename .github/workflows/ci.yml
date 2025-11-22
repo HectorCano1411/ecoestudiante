@@ -123,11 +123,22 @@ jobs:
           AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
           AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
       
+      - name: Verify pact files were generated
+        working-directory: ./ecoestudiante-web
+        run: |
+          if [ ! -d "pacts" ] || [ -z "$(ls -A pacts/*.json 2>/dev/null)" ]; then
+            echo "❌ Error: No se generaron archivos pact"
+            exit 1
+          fi
+          echo "✅ Pact files generados:"
+          ls -la pacts/
+      
       - name: Upload pact files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pact-files
           path: ecoestudiante-web/pacts/*.json
+          retention-days: 7
       
       # Step 2: Verificar pact files en el gateway (provider)
       - name: Setup Java
@@ -137,11 +148,25 @@ jobs:
           distribution: 'temurin'
           cache: maven
       
+      - name: Create pacts directory in gateway
+        working-directory: ./ecoestudiante-gateway
+        run: mkdir -p src/test/resources/pacts
+      
       - name: Download pact files
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pact-files
           path: ecoestudiante-gateway/src/test/resources/pacts
+      
+      - name: Verify pact files are in gateway
+        working-directory: ./ecoestudiante-gateway
+        run: |
+          if [ -z "$(ls -A src/test/resources/pacts/*.json 2>/dev/null)" ]; then
+            echo "❌ Error: No se encontraron archivos pact en el gateway"
+            exit 1
+          fi
+          echo "✅ Pact files encontrados en gateway:"
+          ls -la src/test/resources/pacts/
       
       - name: Run provider tests (verify pacts)
         working-directory: ./ecoestudiante-gateway

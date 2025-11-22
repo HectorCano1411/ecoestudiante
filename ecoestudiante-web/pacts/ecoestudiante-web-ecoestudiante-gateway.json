@@ -1,0 +1,204 @@
+{
+  "consumer": {
+    "name": "ecoestudiante-web"
+  },
+  "interactions": [
+    {
+      "description": "una petición para calcular electricidad",
+      "providerState": "usuario autenticado con scope read:carbon",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIs..."
+        },
+        "matchingRules": {
+          "$.header.Authorization": {
+            "match": "type"
+          }
+        },
+        "method": "GET",
+        "path": "/api/v1/calc/electricity",
+        "query": "country=CL&kwh=100&period=2025-01"
+      },
+      "response": {
+        "body": {
+          "calcId": "calc-123",
+          "category": "electricity",
+          "co2e": 45.5,
+          "createdAt": "2025-11-06T20:00:00Z",
+          "input": {
+            "country": "CL",
+            "kwh": 100,
+            "period": "2025-01"
+          },
+          "unit": "kgCO2e"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "$.body.calcId": {
+            "match": "type"
+          },
+          "$.body.co2e": {
+            "match": "type"
+          },
+          "$.body.createdAt": {
+            "match": "type"
+          },
+          "$.body.input.country": {
+            "match": "type"
+          },
+          "$.body.input.kwh": {
+            "match": "type"
+          },
+          "$.body.input.period": {
+            "match": "type"
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "una petición para crear cálculo de electricidad",
+      "providerState": "usuario autenticado con scope write:carbon",
+      "request": {
+        "body": {
+          "country": "CL",
+          "kwh": 150,
+          "period": "2025-01"
+        },
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIs...",
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "$.header.Authorization": {
+            "match": "type"
+          }
+        },
+        "method": "POST",
+        "path": "/api/v1/calc/electricity"
+      },
+      "response": {
+        "body": {
+          "calcId": "calc-456",
+          "category": "electricity",
+          "co2e": 68.25,
+          "createdAt": "2025-11-06T20:00:00Z",
+          "input": {
+            "country": "CL",
+            "kwh": 150,
+            "period": "2025-01"
+          },
+          "unit": "kgCO2e"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "$.body.calcId": {
+            "match": "type"
+          },
+          "$.body.co2e": {
+            "match": "type"
+          },
+          "$.body.createdAt": {
+            "match": "type"
+          },
+          "$.body.input.country": {
+            "match": "type"
+          },
+          "$.body.input.kwh": {
+            "match": "type"
+          },
+          "$.body.input.period": {
+            "match": "type"
+          }
+        },
+        "status": 201
+      }
+    },
+    {
+      "description": "una petición para obtener historial",
+      "providerState": "usuario autenticado con historial de cálculos",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJSUzI1NiIs..."
+        },
+        "matchingRules": {
+          "$.header.Authorization": {
+            "match": "type"
+          }
+        },
+        "method": "GET",
+        "path": "/api/v1/calc/history",
+        "query": "page=0&pageSize=20"
+      },
+      "response": {
+        "body": {
+          "items": [
+            {
+              "calcId": "calc-789",
+              "category": "electricity",
+              "co2e": 45.5,
+              "createdAt": "2025-11-06T20:00:00Z"
+            }
+          ],
+          "page": 0,
+          "pageSize": 20,
+          "totalItems": 5,
+          "totalPages": 1
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "$.body.items": {
+            "match": "type",
+            "min": 1
+          },
+          "$.body.items[*].calcId": {
+            "match": "type"
+          },
+          "$.body.items[*].category": {
+            "match": "type"
+          },
+          "$.body.items[*].co2e": {
+            "match": "type"
+          },
+          "$.body.items[*].createdAt": {
+            "match": "type"
+          },
+          "$.body.page": {
+            "match": "type"
+          },
+          "$.body.pageSize": {
+            "match": "type"
+          },
+          "$.body.totalItems": {
+            "match": "type"
+          },
+          "$.body.totalPages": {
+            "match": "type"
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "13.1.0"
+    },
+    "pactRust": {
+      "ffi": "0.4.22",
+      "models": "1.2.3"
+    },
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  },
+  "provider": {
+    "name": "ecoestudiante-gateway"
+  }
+}

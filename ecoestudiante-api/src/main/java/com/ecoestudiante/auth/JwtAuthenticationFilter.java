@@ -121,15 +121,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Usar userId como principal si username no está disponible
                 // Esto es crítico para tokens Auth0 que pueden no tener email/name
                 String principal = (username != null && !username.isBlank()) ? username : userId;
-                
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                     principal,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-                
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    
                 logger.info("✅ Autenticación establecida en SecurityContext - Principal: {}, UserId: {}", principal, userId);
             } else {
                 logger.warn("⚠️ Token presente pero no se pudo establecer autenticación - Token válido: {}, Username: {}, UserId: {}", 

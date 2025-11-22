@@ -48,14 +48,18 @@ public class StatsController {
     @GetMapping("/by-category")
     @Operation(
         summary = "Obtener estadísticas por categoría",
-        description = "Retorna estadísticas agrupadas por categoría de emisión"
+        description = "Retorna estadísticas agrupadas por categoría de emisión con filtros opcionales"
     )
     @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<StatsDtos.StatsByCategoryResponse> getByCategory(HttpServletRequest request) {
+    public ResponseEntity<StatsDtos.StatsByCategoryResponse> getByCategory(
+            HttpServletRequest request,
+            @RequestParam(value = "categories", required = false) java.util.List<String> categories
+    ) {
         try {
             String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
-            logger.info("Obteniendo estadísticas por categoría para usuario: {}", userId);
-            StatsDtos.StatsByCategoryResponse response = statsService.getByCategory(userId);
+            logger.info("Obteniendo estadísticas por categoría para usuario: {} con {} categorías filtradas", 
+                userId, categories != null ? categories.size() : 0);
+            StatsDtos.StatsByCategoryResponse response = statsService.getByCategory(userId, categories);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error al obtener estadísticas por categoría", e);
@@ -118,13 +122,32 @@ public class StatsController {
     )
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<java.util.Map<String, java.util.List<String>>> getAvailableCategories(HttpServletRequest request) {
+        logger.info("=== ENDPOINT /available-categories LLAMADO ===");
         try {
             String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
-            logger.info("Obteniendo categorías disponibles para usuario: {}", userId);
+            logger.info("Usuario autenticado: {}", userId);
+            logger.info("Llamando a statsService.getAvailableCategories...");
+            
             java.util.Map<String, java.util.List<String>> categories = statsService.getAvailableCategories(userId);
+            
+            logger.info("Categorías obtenidas del servicio: {} categorías", categories != null ? categories.size() : 0);
+            if (categories != null && !categories.isEmpty()) {
+                for (java.util.Map.Entry<String, java.util.List<String>> entry : categories.entrySet()) {
+                    logger.info("  - {}: {} subcategorías", entry.getKey(), entry.getValue() != null ? entry.getValue().size() : 0);
+                }
+            } else {
+                logger.warn("El servicio retornó un mapa vacío o null");
+            }
+            
+            logger.info("Retornando respuesta HTTP 200 OK");
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
-            logger.error("Error al obtener categorías disponibles", e);
+            logger.error("=== ERROR EN ENDPOINT /available-categories ===", e);
+            logger.error("Mensaje de error: {}", e.getMessage());
+            logger.error("Tipo de excepción: {}", e.getClass().getName());
+            if (e.getCause() != null) {
+                logger.error("Causa: {}", e.getCause().getMessage());
+            }
             throw new RuntimeException("Error al obtener categorías disponibles", e);
         }
     }

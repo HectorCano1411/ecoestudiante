@@ -419,20 +419,45 @@ public class CalcServiceImpl implements CalcService {
         ? jdbc.queryForObject(countSql, Long.class, userIdUuid, category)
         : jdbc.queryForObject(countSql, Long.class, userIdUuid);
     
-    // Obtener registros paginados
+    // Obtener registros paginados con información del factor de emisión
+    // Usar subconsulta para obtener el factor_snapshot más reciente de cada cálculo
     String sql = category != null && !category.isBlank()
         ? """
-            SELECT id::text, category, input_json, result_kg_co2e, created_at
-            FROM calculation
-            WHERE user_id = ?::uuid AND category = ?
-            ORDER BY created_at DESC
+            SELECT 
+              c.id::text, 
+              c.category, 
+              c.input_json, 
+              c.result_kg_co2e, 
+              c.created_at,
+              (
+                SELECT ca.factor_snapshot 
+                FROM calculation_audit ca 
+                WHERE ca.calculation_id = c.id 
+                ORDER BY ca.created_at DESC 
+                LIMIT 1
+              ) as factor_snapshot
+            FROM calculation c
+            WHERE c.user_id = ?::uuid AND c.category = ?
+            ORDER BY c.created_at DESC
             LIMIT ? OFFSET ?
             """
         : """
-            SELECT id::text, category, input_json, result_kg_co2e, created_at
-            FROM calculation
-            WHERE user_id = ?::uuid
-            ORDER BY created_at DESC
+            SELECT 
+              c.id::text, 
+              c.category, 
+              c.input_json, 
+              c.result_kg_co2e, 
+              c.created_at,
+              (
+                SELECT ca.factor_snapshot 
+                FROM calculation_audit ca 
+                WHERE ca.calculation_id = c.id 
+                ORDER BY ca.created_at DESC 
+                LIMIT 1
+              ) as factor_snapshot
+            FROM calculation c
+            WHERE c.user_id = ?::uuid
+            ORDER BY c.created_at DESC
             LIMIT ? OFFSET ?
             """;
     
@@ -444,11 +469,19 @@ public class CalcServiceImpl implements CalcService {
                 Map<String, Object> input = mapper.readValue(rs.getString("input_json"), 
                     new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
                 
+                String cat = rs.getString("category");
+                String subcategory = extractSubcategory(cat, input);
+                
+                // Extraer información del factor de emisión desde factor_snapshot
+                CalcDtos.FactorInfo factorInfo = extractFactorInfo(rs.getString("factor_snapshot"));
+                
                 return new CalcDtos.CalcHistoryItem(
                   rs.getString("id"),
-                  rs.getString("category"),
+                  cat,
+                  subcategory,
                   input,
                   rs.getBigDecimal("result_kg_co2e").doubleValue(),
+                  factorInfo,
                   rs.getTimestamp("created_at").toLocalDateTime()
                 );
               } catch (Exception e) {
@@ -463,11 +496,19 @@ public class CalcServiceImpl implements CalcService {
                 Map<String, Object> input = mapper.readValue(rs.getString("input_json"), 
                     new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
                 
+                String cat = rs.getString("category");
+                String subcategory = extractSubcategory(cat, input);
+                
+                // Extraer información del factor de emisión desde factor_snapshot
+                CalcDtos.FactorInfo factorInfo = extractFactorInfo(rs.getString("factor_snapshot"));
+                
                 return new CalcDtos.CalcHistoryItem(
                   rs.getString("id"),
-                  rs.getString("category"),
+                  cat,
+                  subcategory,
                   input,
                   rs.getBigDecimal("result_kg_co2e").doubleValue(),
+                  factorInfo,
                   rs.getTimestamp("created_at").toLocalDateTime()
                 );
               } catch (Exception e) {
@@ -482,6 +523,104 @@ public class CalcServiceImpl implements CalcService {
       page,
       pageSize
     );
+  }
+  
+  /**
+   * Extrae la información del factor de emisión desde el factor_snapshot JSON
+   */
+  private CalcDtos.FactorInfo extractFactorInfo(String factorSnapshotJson) {
+    if (factorSnapshotJson == null || factorSnapshotJson.isBlank()) {
+      return new CalcDtos.FactorInfo(null, null, null);
+    }
+    
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      Map<String, Object> snapshot = mapper.readValue(factorSnapshotJson, 
+          new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+      
+      Object valueObj = snapshot.get("value");
+      Double value = null;
+      if (valueObj != null) {
+        if (valueObj instanceof Number) {
+          value = ((Number) valueObj).doubleValue();
+        } else if (valueObj instanceof String) {
+          value = Double.parseDouble((String) valueObj);
+        }
+      }
+      
+      String unit = (String) snapshot.get("unit");
+      String subcategory = (String) snapshot.get("subcategory");
+      
+      return new CalcDtos.FactorInfo(value, unit, subcategory);
+    } catch (Exception e) {
+      logger.warn("Error extrayendo información del factor desde snapshot: {}", factorSnapshotJson, e);
+      return new CalcDtos.FactorInfo(null, null, null);
+    }
+  }
+  
+  /**
+   * Extrae la subcategoría de un registro basándose en la categoría y los datos de entrada
+   */
+  private String extractSubcategory(String category, Map<String, Object> input) {
+    if (category == null || input == null) {
+      return "";
+    }
+    
+    try {
+      if ("transporte".equals(category)) {
+        String transportMode = (String) input.get("transportMode");
+        String fuelType = (String) input.get("fuelType");
+        
+        if (transportMode == null) {
+          return "";
+        }
+        
+        // Mapear modos de transporte a español
+        String modeLabel = switch (transportMode) {
+          case "car" -> "Auto";
+          case "bus" -> "Bus/Transporte Público";
+          case "metro" -> "Metro/Tren";
+          case "bicycle" -> "Bicicleta";
+          case "walking" -> "Caminando";
+          case "plane" -> "Avión";
+          case "motorcycle" -> "Motocicleta";
+          default -> transportMode;
+        };
+        
+        // Si tiene tipo de combustible, agregarlo
+        if (fuelType != null && !fuelType.isBlank()) {
+          String fuelLabel = switch (fuelType.toLowerCase()) {
+            case "gasoline" -> "Gasolina";
+            case "diesel" -> "Diesel";
+            case "electric" -> "Eléctrico";
+            case "hybrid" -> "Híbrido";
+            default -> fuelType;
+          };
+          return modeLabel + " - " + fuelLabel;
+        }
+        
+        return modeLabel;
+        
+      } else if ("electricidad".equals(category)) {
+        // Para electricidad, mostrar los electrodomésticos
+        Object appliancesObj = input.get("selectedAppliances");
+        if (appliancesObj instanceof java.util.List) {
+          @SuppressWarnings("unchecked")
+          java.util.List<String> appliances = (java.util.List<String>) appliancesObj;
+          if (appliances != null && !appliances.isEmpty()) {
+            return String.join(", ", appliances);
+          }
+        }
+        return "Electricidad";
+        
+      } else {
+        // Para otras categorías, retornar la categoría misma
+        return category;
+      }
+    } catch (Exception e) {
+      logger.warn("Error extrayendo subcategoría para categoría: {}", category, e);
+      return "";
+    }
   }
 }
 

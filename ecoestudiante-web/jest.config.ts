@@ -11,6 +11,33 @@ const config: Config = {
     '**/__tests__/**/*.test.[jt]s?(x)',
     '**/?(*.)+(spec|test).[jt]s?(x)',
   ],
+  // Configuración específica para tests de contract (Pact)
+  projects: [
+    {
+      displayName: 'default',
+      preset: 'ts-jest',
+      testEnvironment: 'jsdom',
+      testMatch: [
+        '**/__tests__/**/*.test.[jt]s?(x)',
+        '**/?(*.)+(spec|test).[jt]s?(x)',
+      ],
+      testPathIgnorePatterns: ['/node_modules/', '/__tests__/contract/'],
+      setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+      moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/src/$1',
+      },
+    },
+    {
+      displayName: 'contract',
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      testMatch: ['**/__tests__/contract/**/*.test.[jt]s?(x)'],
+      setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+      moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/src/$1',
+      },
+    },
+  ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',

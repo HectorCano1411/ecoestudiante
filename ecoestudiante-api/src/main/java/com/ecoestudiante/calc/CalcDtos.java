@@ -52,15 +52,28 @@ public final class CalcDtos {
       String factorHash
   ) {}
 
+  public record FactorInfo(
+      @Schema(description = "Valor del factor de emisión")
+      Double value,
+      @Schema(description = "Unidad del factor (kgCO2e/km, kgCO2e/kWh, etc.)")
+      String unit,
+      @Schema(description = "Subcategoría del factor (para transporte)")
+      String subcategory
+  ) {}
+  
   public record CalcHistoryItem(
       @Schema(description = "ID del cálculo")
       String calcId,
       @Schema(description = "Categoría")
       String category,
+      @Schema(description = "Subcategoría (modo de transporte, tipo de electrodoméstico, etc.)")
+      String subcategory,
       @Schema(description = "Datos de entrada (JSON)")
       Map<String, Object> input,
       @Schema(description = "Resultado en kgCO2e")
       double kgCO2e,
+      @Schema(description = "Información del factor de emisión utilizado")
+      FactorInfo factorInfo,
       @Schema(description = "Fecha de creación")
       LocalDateTime createdAt
   ) {}
