@@ -74,7 +74,7 @@ export interface CalcHistoryItem {
     career?: string;
     schedule?: string;
     // Otros campos comunes
-    [key: string]: any;
+    [key: string]: unknown;
   };
   kgCO2e: number;
   factorInfo: FactorInfo | null;
