@@ -128,7 +128,7 @@ export default function MobilityMap({
         map.current = null;
       }
     };
-  }, [initialOrigin]);
+  }, [initialOrigin]); // Dependencia: initialOrigin
 
   // Geocodificación inversa
   const geocodeLocation = useCallback(async (lat: number, lng: number): Promise<string | null> => {
