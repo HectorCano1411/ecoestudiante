@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     headers,
   });
 
-  logger.info('route:history', 'outcome', { total: json.total });
+  logger.info('route:history', 'outcome', { total: (json as any).total });
   return NextResponse.json(json);
 }
 

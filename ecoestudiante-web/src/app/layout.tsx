@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { UserProvider } from '@auth0/nextjs-auth0/client';
 import "./globals.css";
@@ -16,6 +16,29 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "EcoEstudiante - Calcula tu Huella de Carbono",
   description: "Plataforma educativa para calcular y reducir tu huella de carbono. Únete a la comunidad de estudiantes comprometidos con el medio ambiente.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "EcoEstudiante",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: "#4caf50",
 };
 
 export default function RootLayout({

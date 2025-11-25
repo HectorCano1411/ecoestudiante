@@ -391,5 +391,21 @@ public class AuthService {
             throw new IllegalArgumentException("Token de Google inválido o corrupto");
         }
     }
+
+    public AuthDtos.UserInfo getUserInfo(String username) {
+        logger.debug("Obteniendo información del usuario: {}", username);
+
+        AppUser user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado: " + username));
+
+        return new AuthDtos.UserInfo(
+            user.getId().toString(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getCarrera(),
+            user.getJornada(),
+            user.isEmailVerified()
+        );
+    }
 }
 

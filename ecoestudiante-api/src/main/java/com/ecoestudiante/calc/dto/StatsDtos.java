@@ -1,9 +1,15 @@
-package com.ecoestudiante.stats;
+package com.ecoestudiante.calc.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * DTOs para estadísticas de cálculos CO₂e.
+ * 
+ * Parte del bounded context de Cálculo.
+ * Movido desde com.ecoestudiante.stats como parte de la reorganización arquitectónica.
+ */
 public final class StatsDtos {
 
     public record StatsSummary(
@@ -73,4 +79,7 @@ public final class StatsDtos {
             double totalKgCO2e
     ) {}
 }
+
+
+
 

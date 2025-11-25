@@ -218,3 +218,5 @@ Los tests que pasan localmente deberían pasar en CI/CD. Si hay diferencias:
 
 **¿Preguntas?** Revisa la documentación de Jest: https://jestjs.io/docs/getting-started
 
+
+

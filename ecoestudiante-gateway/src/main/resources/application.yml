@@ -7,24 +7,68 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: calculo-route
-          uri: http://localhost:18080
+        # Servicio de Autenticación
+        # Ruta: /api/v1/auth/** y /api/auth/**
+        # Incluye: login, registro, refresh token, verificación de email
+        # NOTA: NO usar StripPrefix - el backend espera la ruta completa /api/v1/auth/**
+        # El backend está mapeado a @RequestMapping({"/api/v1/auth", "/api/auth"})
+        - id: auth-service
+          uri: ${BACKEND_API_URL:http://localhost:18080}
+          predicates:
+            - Path=/api/v1/auth/**,/api/auth/**
+          metadata:
+            service-name: auth-service  # Para trazas OpenTelemetry (Fase 3)
+        
+        # Servicio de Cálculo CO₂e
+        # Ruta: /api/v1/calc/**
+        # Incluye: cálculos de electricidad, transporte, historial y estadísticas
+        # NOTA: NO usar StripPrefix - el backend espera la ruta completa /api/v1/calc/**
+        # El StatsController está mapeado a @RequestMapping("/api/v1/calc/stats")
+        - id: calc-service
+          uri: ${BACKEND_API_URL:http://localhost:18080}
+          predicates:
+            - Path=/api/v1/calc/**
+          metadata:
+            service-name: calc-service  # Para trazas OpenTelemetry (Fase 3)
+        
+        # Servicio de Gamificación
+        # Ruta: /api/v1/gam/**
+        # Incluye: challenges, XP, streaks, achievements
+        # NOTA: NO usar StripPrefix - el backend espera la ruta completa /api/v1/gam/**
+        - id: gam-service
+          uri: ${BACKEND_API_URL:http://localhost:18080}
+          predicates:
+            - Path=/api/v1/gam/**
+          metadata:
+            service-name: gamification-service  # Para trazas OpenTelemetry (Fase 3)
+        
+        # Servicio de Reportes
+        # Ruta: /api/v1/reports/**
+        # Incluye: generación de reportes, exports, agregados anonimizados
+        # NOTA: NO usar StripPrefix - el backend espera la ruta completa /api/v1/reports/**
+        - id: reports-service
+          uri: ${BACKEND_API_URL:http://localhost:18080}
+          predicates:
+            - Path=/api/v1/reports/**
+          metadata:
+            service-name: reports-service  # Para trazas OpenTelemetry (Fase 3)
+        
+        # Rutas legacy para compatibilidad temporal (DEPRECATED - eliminar en futura versión)
+        # Mantener durante transición para no romper frontend existente
+        - id: calculo-route-legacy
+          uri: ${BACKEND_API_URL:http://localhost:18080}
           predicates:
             - Path=/api/calc/**
           filters:
             - StripPrefix=1
-        - id: reportes-route
-          uri: http://localhost:18080
-          predicates:
-            - Path=/api/reportes/**
-          filters:
-            - StripPrefix=1
-        - id: stats-route
-          uri: http://localhost:18080
+          order: 100  # Menor prioridad que las rutas v1
+        - id: stats-route-legacy
+          uri: ${BACKEND_API_URL:http://localhost:18080}
           predicates:
             - Path=/api/stats/**
           filters:
-            - StripPrefix=1
+            - RewritePath=/api/stats/(?<segment>.*), /api/v1/calc/stats/${segment}  # Redirigir a nueva ruta
+          order: 100
       globalcors:
         cors-configurations:
           '[/**]':
@@ -46,6 +90,11 @@ spring:
           issuer-uri: ${AUTH0_ISSUER_BASE_URL:https://dev-xxxxx.us.auth0.com/}
           audience: ${AUTH0_AUDIENCE:https://api.ecoestudiante.com}
 
+# JWT Configuration para validar tokens del backend
+# Esta secret key debe coincidir con la del backend (ecoestudiante-api)
+jwt:
+  secret: ${JWT_SECRET:YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+
 management:
   endpoints:
     web:
@@ -58,6 +107,13 @@ management:
 
 logging:
   level:
+    # Logging detallado para debugging
     org.springframework.security: DEBUG
     org.springframework.cloud.gateway: DEBUG
+    com.ecoestudiante.gateway: INFO  # Nuestro filtro de logging
+    org.springframework.web: DEBUG  # Para ver detalles de peticiones HTTP
+    reactor.netty: DEBUG  # Para ver detalles de conexiones Netty
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] - %msg%n"
 

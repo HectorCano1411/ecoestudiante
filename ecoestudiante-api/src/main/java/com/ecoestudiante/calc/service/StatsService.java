@@ -1,6 +1,7 @@
-package com.ecoestudiante.stats;
+package com.ecoestudiante.calc.service;
 
 import com.ecoestudiante.auth.TokenUtil;
+import com.ecoestudiante.calc.dto.StatsDtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -10,6 +11,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Servicio de estadísticas de cálculos CO₂e.
+ * 
+ * Parte del bounded context de Cálculo.
+ * Proporciona estadísticas derivadas de los cálculos realizados por los usuarios.
+ * 
+ * Movido desde com.ecoestudiante.stats como parte de la reorganización arquitectónica.
+ */
 @Service
 public class StatsService {
 
@@ -798,4 +807,7 @@ public class StatsService {
         return result;
     }
 }
+
+
+
 

@@ -1,7 +1,9 @@
-package com.ecoestudiante.calc;
+package com.ecoestudiante.calc.controller;
 
 import com.ecoestudiante.auth.UserContext;
 import com.ecoestudiante.auth.UserContextResolver;
+import com.ecoestudiante.calc.dto.CalcDtos;
+import com.ecoestudiante.calc.service.CalcService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,9 +18,21 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Controlador REST para el Servicio de Cálculo CO₂e.
+ * 
+ * Este bounded context maneja:
+ * - Cálculos de electricidad
+ * - Cálculos de transporte
+ * - Historial de cálculos
+ * - Factores de emisión aplicados
+ * 
+ * Ruta base: /api/v1/calc
+ * Alineado con arquitectura de microservicios descrita en la tesis.
+ */
 @RestController
 @RequestMapping("/api/v1/calc")
-@Tag(name = "Calc", description = "Cálculos de emisiones")
+@Tag(name = "Cálculo CO₂e", description = "API para cálculo de huella de carbono")
 public class CalcController {
 
   private static final Logger logger = LoggerFactory.getLogger(CalcController.class);
@@ -66,14 +80,24 @@ public class CalcController {
     // Extraer userId del token si no está en el body o está vacío
     String userId = in.userId();
     String normalizedUserId;
+
     if (userId == null || userId.isBlank()) {
+      // Si no viene userId en el body, extraerlo del token
       UserContext context = userContextResolver.resolve(request);
       normalizedUserId = context.normalizedUserIdAsString();
       userId = context.userId();
+      logger.debug("UserId extraído del token - original: {}, normalizado: {}", userId, normalizedUserId);
     } else {
+      // Si viene userId en el body, normalizarlo
       normalizedUserId = userContextResolver.normalizeUserId(userId);
+      logger.debug("UserId del body normalizado - original: {}, normalizado: {}", userId, normalizedUserId);
     }
-    
+
+    // Validación adicional para asegurar que el userId no es null
+    if (userId == null || userId.isBlank() || normalizedUserId == null || normalizedUserId.isBlank()) {
+      throw new IllegalArgumentException("No se pudo obtener el userId del token o del body");
+    }
+
     // Crear nuevo input con userId normalizado
     var normalized = new CalcDtos.ElectricityInput(
         in.kwh(),
@@ -85,8 +109,8 @@ public class CalcController {
         in.career(),
         in.schedule()
     );
-    
-    logger.debug("Procesando cálculo de electricidad - userId original: {}, userId normalizado: {}", userId, normalizedUserId);
+
+    logger.debug("Procesando cálculo de electricidad - kwh: {}, country: {}, period: {}", in.kwh(), in.country(), in.period());
     return svc.computeElectricity(normalized);
   }
 

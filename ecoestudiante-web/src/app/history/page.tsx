@@ -30,17 +30,6 @@ export default function HistoryPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const pageSize = 20;
 
-  useEffect(() => {
-    // Verificar autenticación
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    
-    loadHistory();
-  }, [category, page, loadHistory, router]);
-
   const loadHistory = useCallback(async () => {
     try {
       setLoading(true);
@@ -58,6 +47,17 @@ export default function HistoryPage() {
       setLoading(false);
     }
   }, [category, page, pageSize]);
+
+  useEffect(() => {
+    // Verificar autenticación
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    
+    loadHistory();
+  }, [category, page, loadHistory, router]);
 
   const toggleExpand = useCallback((calcId: string) => {
     setExpandedItems(prev => {

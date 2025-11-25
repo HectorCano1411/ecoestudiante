@@ -1,4 +1,6 @@
-package com.ecoestudiante.calc;
+package com.ecoestudiante.calc.service;
+
+import com.ecoestudiante.calc.dto.CalcDtos;
 
 public interface CalcService {
   CalcDtos.CalcResult computeElectricity(CalcDtos.ElectricityInput in);

@@ -20,32 +20,32 @@ export default function DashboardPage() {
   const [authMethod, setAuthMethod] = useState<'jwt' | 'auth0' | null>(null);
 
   useEffect(() => {
-    // Verificar autenticación: Auth0 o JWT tradicional
-    if (auth0Loading) {
-      return; // Esperar a que Auth0 cargue
-    }
-
-    // Primero verificar Auth0
-    if (auth0User) {
-      setUsername(auth0User.name || auth0User.email || 'Usuario');
-      setAuthMethod('auth0');
-      setLoading(false);
-      return;
-    }
-
-    // Si no hay Auth0, verificar JWT tradicional
+    // SOLUCIÓN: Verificar JWT PRIMERO (más rápido y no bloquea)
+    // Luego verificar Auth0 si no hay JWT
     const token = localStorage.getItem('authToken');
     const user = localStorage.getItem('username');
     
     if (token && user) {
+      // JWT tradicional encontrado - usar inmediatamente
       setUsername(user);
       setAuthMethod('jwt');
       setLoading(false);
       return;
     }
     
-    // Si no hay ninguna autenticación, redirigir al login
-    router.push('/login');
+    // Si no hay JWT, verificar Auth0 (pero no bloquear si está cargando)
+    if (!auth0Loading) {
+      if (auth0User) {
+        setUsername(auth0User.name || auth0User.email || 'Usuario');
+        setAuthMethod('auth0');
+        setLoading(false);
+        return;
+      }
+      
+      // Si no hay ninguna autenticación, redirigir al login
+      router.push('/login');
+    }
+    // Si auth0Loading es true, esperar un poco más antes de redirigir
   }, [router, auth0User, auth0Loading]);
 
   const loadStats = useCallback(async () => {

@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getSession, getAccessToken, UserProfile } from '@auth0/nextjs-auth0';
+import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
 
 /**
  * Obtiene la sesión del usuario actual
  */
-export async function getServerSession(): Promise<UserProfile | null> {
+export async function getServerSession(): Promise<any | null> {
   try {
     const session = await getSession();
     return session?.user || null;

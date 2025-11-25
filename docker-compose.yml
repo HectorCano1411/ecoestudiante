@@ -1,0 +1,212 @@
+# =============================================================================
+# EcoEstudiante - Docker Compose
+# =============================================================================
+# Orquestación completa del sistema:
+# - PostgreSQL: Base de datos
+# - API: Backend Spring Boot (puerto interno 8080, externo 18080)
+# - Gateway: Spring Cloud Gateway (puerto 8080)
+# - Web: Frontend Next.js (puerto 3000)
+# - Redis: Cache para rate limiting (Fase 4)
+#
+# Uso:
+#   docker-compose up -d              # Levantar todos los servicios
+#   docker-compose up -d --build      # Rebuild y levantar
+#   docker-compose logs -f api        # Ver logs del API
+#   docker-compose down               # Detener servicios
+#   docker-compose down -v            # Detener y eliminar volúmenes
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: eco-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecoestudiante}
+      POSTGRES_USER: ${POSTGRES_USER:-eco}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eco}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eco} -d ${POSTGRES_DB:-ecoestudiante}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ecoestudiante-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # pgAdmin - Interfaz Web para PostgreSQL
+  # ===========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eco-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@ecoestudiante.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecoestudiante-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Redis (para Rate Limiting - Fase 4)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: eco-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ecoestudiante-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Backend API (Spring Boot)
+  # ===========================================================================
+  api:
+    build:
+      context: ./ecoestudiante-api
+      dockerfile: Dockerfile
+    container_name: eco-api
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ecoestudiante}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eco}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-eco}
+      JWT_SECRET: ${JWT_SECRET:-YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+      # Auth0 (opcional)
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://api.ecoestudiante.com}
+      # Email (opcional)
+      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    ports:
+      - "18080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ecoestudiante-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # API Gateway (Spring Cloud Gateway)
+  # ===========================================================================
+  gateway:
+    build:
+      context: ./ecoestudiante-gateway
+      dockerfile: Dockerfile
+    container_name: eco-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BACKEND_API_URL: http://api:8080
+      JWT_SECRET: ${JWT_SECRET:-YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+      # Auth0 (opcional)
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://api.ecoestudiante.com}
+      # Redis para rate limiting (Fase 4)
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    ports:
+      - "8888:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ecoestudiante-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Frontend Web (Next.js)
+  # ===========================================================================
+  web:
+    build:
+      context: ./ecoestudiante-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8888
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    container_name: eco-web
+    environment:
+      NODE_ENV: production
+      # API Gateway URL (para SSR server-side)
+      GATEWAY_BASE_URL: http://gateway:8080
+      # API Gateway URL (para cliente browser)
+      NEXT_PUBLIC_API_URL: http://localhost:8888
+      # Mapbox (para mapas de movilidad)
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+      # Auth0 (opcional - solo si están TODAS las variables configuradas)
+      AUTH0_SECRET: ${AUTH0_SECRET:-}
+      AUTH0_BASE_URL: ${AUTH0_BASE_URL:-http://localhost:3000}
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ecoestudiante-network
+    restart: unless-stopped
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: ecoestudiante-postgres-data
+  pgadmin_data:
+    name: ecoestudiante-pgadmin-data
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  ecoestudiante-network:
+    name: ecoestudiante-network
+    driver: bridge

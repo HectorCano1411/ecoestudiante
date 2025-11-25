@@ -2,31 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
-import { getAccessToken } from '@auth0/nextjs-auth0';
 
+/**
+ * SOLUCIÓN DEFINITIVA: Eliminamos completamente la dependencia de Auth0
+ * porque @auth0/nextjs-auth0 v3.3.0 NO es compatible con Next.js 15.
+ * Este endpoint SOLO soporta autenticación JWT tradicional del header Authorization.
+ */
 export async function GET(req: NextRequest) {
   try {
-    // Intentar obtener token de Auth0 primero
-    let authHeader: string | null = null;
-    
-    try {
-      const tokenResult = await getAccessToken();
-      if (tokenResult?.accessToken) {
-        authHeader = `Bearer ${tokenResult.accessToken}`;
-        logger.info('route:stats-time-series', 'Using Auth0 token');
-      }
-    } catch (auth0Error: any) {
-      logger.debug('route:stats-time-series', 'Auth0 token not available, trying header', {
-        error: auth0Error.message
-      });
-    }
-    
-    // Si no hay token de Auth0, buscar en el header Authorization (JWT tradicional)
-    if (!authHeader) {
-      authHeader = req.headers.get('authorization') || 
-                   req.headers.get('Authorization') ||
-                   req.headers.get('AUTHORIZATION');
-    }
+    // SOLUCIÓN: Usar SOLO JWT del header Authorization (sin Auth0)
+    const authHeader = req.headers.get('authorization') || 
+                       req.headers.get('Authorization') ||
+                       req.headers.get('AUTHORIZATION');
     
     if (!authHeader) {
       logger.warn('route:stats-time-series', 'No authorization token found');
@@ -87,16 +74,17 @@ export async function GET(req: NextRequest) {
     };
 
     logger.info('route:stats-time-series', 'Calling backend', { 
-      backendUrl: `/api/v1/stats/time-series?${params.toString()}`,
+      backendUrl: `/api/v1/calc/stats/time-series?${params.toString()}`,
       hasToken: true 
     });
     
-    const json = await backendFetch(`/api/v1/stats/time-series?${params.toString()}`, {
+    // ACTUALIZADO: Nueva ruta /api/v1/calc/stats (stats ahora forma parte del bounded context calc)
+    const json = await backendFetch(`/api/v1/calc/stats/time-series?${params.toString()}`, {
       method: 'GET',
       headers,
     });
 
-    logger.info('route:stats-time-series', 'outcome', { success: true, dataPoints: json.data?.length || 0 });
+    logger.info('route:stats-time-series', 'outcome', { success: true, dataPoints: (json as any).data?.length || 0 });
     return NextResponse.json(json);
   } catch (error: any) {
     logger.error('route:stats-time-series', 'error', {

@@ -1,6 +1,7 @@
-package com.ecoestudiante.calc;
+package com.ecoestudiante.calc.service;
 
 import com.ecoestudiante.auth.TokenUtil;
+import com.ecoestudiante.calc.dto.CalcDtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -52,6 +53,17 @@ public class CalcServiceImpl implements CalcService {
 
   @Override
   public CalcDtos.CalcResult computeElectricity(CalcDtos.ElectricityInput in) {
+    // Validación de entrada
+    if (in.userId() == null || in.userId().isBlank()) {
+      throw new IllegalArgumentException("userId es requerido para computar electricidad");
+    }
+    if (in.idempotencyKey() == null || in.idempotencyKey().isBlank()) {
+      throw new IllegalArgumentException("idempotencyKey es requerido para computar electricidad");
+    }
+
+    logger.debug("Iniciando cálculo de electricidad - userId: {}, kwh: {}, country: {}, period: {}",
+        in.userId(), in.kwh(), in.country(), in.period());
+
     // 1) Idempotencia: si ya existe, devolvemos el mismo calcId y resultado
     var exist = jdbc.query("""
         select id::text, result_kg_co2e, factor_hash
@@ -75,6 +87,7 @@ public class CalcServiceImpl implements CalcService {
     );
 
     if (exist != null) {
+      logger.debug("Cálculo idempotente encontrado - calcId: {}", exist.get("id"));
       double kgPrev = ((BigDecimal) exist.get("kg")).doubleValue();
       return new CalcDtos.CalcResult((String) exist.get("id"), kgPrev, (String) exist.get("hash"));
     }

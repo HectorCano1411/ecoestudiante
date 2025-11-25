@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/lib/api-client';
-import MobilityMap, { Location } from '@/components/MobilityMap';
+import SimpleMobilityMap from '@/components/SimpleMobilityMap';
+import type { Location } from '@/components/MobilityMap';
 import type { TransportInput, CalcResult } from '@/types/calc';
 
 // Factores de emisión para cálculo rápido (previsualización)
@@ -183,6 +184,7 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
       return {
         ...mode,
         emissions: baseEmissions,
+        category: mode.category as 'sustainable' | 'moderate' | 'high' | 'very_high',
       };
     }).sort((a, b) => a.emissions - b.emissions); // Ordenar de menor a mayor emisión
   }, [mapDistance, occupancy, transportMode, fuelType]);
@@ -342,7 +344,7 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
           Haz clic en el mapa para establecer el punto de partida, luego haz clic nuevamente para establecer el destino.
           El sistema calculará automáticamente la distancia y las emisiones de carbono.
         </p>
-        <MobilityMap
+        <SimpleMobilityMap
           onOriginChange={setOrigin}
           onDestinationChange={setDestination}
           onDistanceChange={setMapDistance}

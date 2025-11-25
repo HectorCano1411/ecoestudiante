@@ -2,33 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
-import { getAccessToken } from '@auth0/nextjs-auth0';
-// getSession is imported but not used in this file
 
+/**
+ * SOLUCIÓN DEFINITIVA: Eliminamos completamente la dependencia de Auth0
+ * porque @auth0/nextjs-auth0 v3.3.0 NO es compatible con Next.js 15.
+ * Este endpoint SOLO soporta autenticación JWT tradicional del header Authorization.
+ */
 export async function GET(req: NextRequest) {
   try {
-    // Intentar obtener token de Auth0 primero (si el usuario está autenticado con Auth0)
-    let authHeader: string | null = null;
-    
-    try {
-      const tokenResult = await getAccessToken();
-      if (tokenResult?.accessToken) {
-        authHeader = `Bearer ${tokenResult.accessToken}`;
-        logger.info('route:stats-summary', 'Using Auth0 token');
-      }
-    } catch (auth0Error: any) {
-      // Si falla Auth0, intentar obtener el header Authorization del request (JWT tradicional)
-      logger.debug('route:stats-summary', 'Auth0 token not available, trying header', {
-        error: auth0Error.message
-      });
-    }
-    
-    // Si no hay token de Auth0, buscar en el header Authorization (JWT tradicional)
-    if (!authHeader) {
-      authHeader = req.headers.get('authorization') || 
-                   req.headers.get('Authorization') ||
-                   req.headers.get('AUTHORIZATION');
-    }
+    // SOLUCIÓN: Usar SOLO JWT del header Authorization (sin Auth0)
+    const authHeader = req.headers.get('authorization') || 
+                       req.headers.get('Authorization') ||
+                       req.headers.get('AUTHORIZATION');
     
     // Log para debugging (sin exponer el token completo)
     logger.info('route:stats-summary', 'income', { 
@@ -70,26 +55,46 @@ export async function GET(req: NextRequest) {
     };
 
     // Llamar al backend
+    // ACTUALIZADO: Nueva ruta /api/v1/calc/stats (stats ahora forma parte del bounded context calc)
     logger.info('route:stats-summary', 'Calling backend', { 
-      backendUrl: '/api/v1/stats/summary',
+      backendUrl: '/api/v1/calc/stats/summary',
       hasToken: true 
     });
 
-  const json = await backendFetch('/api/v1/stats/summary', {
-    method: 'GET',
-    headers,
-  });
+    const json = await backendFetch('/api/v1/calc/stats/summary', {
+      method: 'GET',
+      headers,
+    });
 
     logger.info('route:stats-summary', 'outcome', { success: true });
-  return NextResponse.json(json);
+    return NextResponse.json(json);
   } catch (error: any) {
     logger.error('route:stats-summary', 'error', {
       error: error.message,
       status: error.status,
-      stack: error.stack
+      stack: error.stack,
+      name: error.name,
+      cause: error.cause
     });
     
-    // Manejar errores del backend
+    // Manejar errores de conexión (Gateway no disponible)
+    if (error.message?.includes('fetch failed') || 
+        error.message?.includes('ECONNREFUSED') ||
+        error.message?.includes('Failed to fetch') ||
+        error.name === 'TypeError') {
+      logger.error('route:stats-summary', 'Connection error - Gateway may be down', {
+        error: error.message
+      });
+      return NextResponse.json(
+        { 
+          error: 'SERVICE_UNAVAILABLE', 
+          message: 'El servicio no está disponible. Por favor, verifica que el Gateway esté ejecutándose en el puerto 8080.' 
+        },
+        { status: 503 }
+      );
+    }
+    
+    // Manejar errores del backend/Gateway
     if (error.status === 401) {
       return NextResponse.json(
         { 
@@ -97,6 +102,16 @@ export async function GET(req: NextRequest) {
           message: error.message || 'Token de autenticación inválido o expirado. Por favor, inicia sesión nuevamente.' 
         },
         { status: 401 }
+      );
+    }
+    
+    if (error.status === 404) {
+      return NextResponse.json(
+        { 
+          error: 'ENDPOINT_NOT_FOUND', 
+          message: 'El endpoint de estadísticas no fue encontrado. Verifica la configuración del Gateway.' 
+        },
+        { status: 404 }
       );
     }
     

@@ -1,0 +1,27 @@
+# Build artifacts
+target/
+
+# Maven wrapper (no necesario en Docker)
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+logs/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Tests (se ejecutan en CI/CD, no en build de imagen)
+src/test/

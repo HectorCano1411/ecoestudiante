@@ -44,9 +44,8 @@ export default function LoginPage() {
       localStorage.setItem("username", response.username);
       localStorage.setItem("userId", response.userId);
 
-      // Redirigir a la página principal
+      // Redirigir a la página principal (sin refresh para evitar loops)
       router.push("/dashboard");
-      router.refresh();
     } catch (e: any) {
       console.error('Login Error:', e);
       

@@ -1,0 +1,82 @@
+# =============================================================================
+# EcoEstudiante Gateway - Perfil Docker
+# =============================================================================
+# Este perfil se activa con: SPRING_PROFILES_ACTIVE=docker
+# Configuración optimizada para ejecución en contenedores
+# =============================================================================
+
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        # Servicio de Autenticación
+        - id: auth-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/auth/**,/api/auth/**
+          metadata:
+            service-name: auth-service
+
+        # Servicio de Cálculo CO₂e
+        - id: calc-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/calc/**
+          metadata:
+            service-name: calc-service
+
+        # Servicio de Gamificación
+        - id: gam-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/gam/**
+          metadata:
+            service-name: gamification-service
+
+        # Servicio de Reportes
+        - id: reports-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/reports/**
+          metadata:
+            service-name: reports-service
+
+  # Redis para rate limiting (Fase 4)
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+      timeout: 2000ms
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+
+# Actuator (health checks para Docker/K8s)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+
+# Logging optimizado para contenedores
+logging:
+  level:
+    root: INFO
+    com.ecoestudiante: INFO
+    org.springframework: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

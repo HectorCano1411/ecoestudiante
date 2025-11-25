@@ -2,31 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
-import { getAccessToken } from '@auth0/nextjs-auth0';
 
+/**
+ * SOLUCIÓN DEFINITIVA: Eliminamos completamente la dependencia de Auth0
+ * porque @auth0/nextjs-auth0 v3.3.0 NO es compatible con Next.js 15.
+ * Este endpoint SOLO soporta autenticación JWT tradicional del header Authorization.
+ */
 export async function GET(req: NextRequest) {
   try {
-    // Intentar obtener token de Auth0 primero
-    let authHeader: string | null = null;
-    
-    try {
-      const tokenResult = await getAccessToken();
-      if (tokenResult?.accessToken) {
-        authHeader = `Bearer ${tokenResult.accessToken}`;
-        logger.info('route:stats-available-careers', 'Using Auth0 token');
-      }
-    } catch (auth0Error: any) {
-      logger.debug('route:stats-available-careers', 'Auth0 token not available, trying header', {
-        error: auth0Error.message
-      });
-    }
-    
-    // Si no hay token de Auth0, buscar en el header Authorization (JWT tradicional)
-    if (!authHeader) {
-      authHeader = req.headers.get('authorization') || 
-                   req.headers.get('Authorization') ||
-                   req.headers.get('AUTHORIZATION');
-    }
+    // SOLUCIÓN: Usar SOLO JWT del header Authorization (sin Auth0)
+    const authHeader = req.headers.get('authorization') || 
+                       req.headers.get('Authorization') ||
+                       req.headers.get('AUTHORIZATION');
     
     if (!authHeader) {
       logger.warn('route:stats-available-careers', 'No authorization token found');
@@ -56,16 +43,17 @@ export async function GET(req: NextRequest) {
     };
 
     logger.info('route:stats-available-careers', 'Calling backend', { 
-      backendUrl: '/api/v1/stats/available-careers',
+      backendUrl: '/api/v1/calc/stats/available-careers',
       hasToken: true 
     });
     
-    const json = await backendFetch('/api/v1/stats/available-careers', {
+    // ACTUALIZADO: Nueva ruta /api/v1/calc/stats (stats ahora forma parte del bounded context calc)
+    const json = await backendFetch('/api/v1/calc/stats/available-careers', {
       method: 'GET',
       headers,
     });
 
-    logger.info('route:stats-available-careers', 'outcome', { success: true, careersCount: Array.isArray(json) ? json.length : 0 });
+    logger.info('route:stats-available-careers', 'outcome', { success: true, careersCount: Array.isArray(json) ? (json as any[]).length : 0 });
     return NextResponse.json(json);
   } catch (error: any) {
     logger.error('route:stats-available-careers', 'error', {

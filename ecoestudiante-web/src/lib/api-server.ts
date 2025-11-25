@@ -3,11 +3,22 @@
 import 'server-only';
 import { logger } from '@/lib/logger';
 
+// IMPORTANTE: Los route handlers deben llamar al Gateway (puerto 8888), no directamente al backend
+// El Gateway maneja el enrutamiento, autenticación y seguridad
+const GATEWAY_BASE = process.env.GATEWAY_BASE_URL ?? 'http://localhost:8888';
 const BACKEND_BASE = process.env.BACKEND_BASE_URL ?? 'http://localhost:18080';
 
+// Usar Gateway por defecto, pero permitir override para casos especiales
+const API_BASE = process.env.USE_GATEWAY !== 'false' ? GATEWAY_BASE : BACKEND_BASE;
+
 export async function backendFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${BACKEND_BASE}${path}`;
-  logger.info('api-server', '→', url, init);
+  const url = `${API_BASE}${path}`;
+  logger.info('api-server', '→', url, { 
+    base: API_BASE, 
+    path, 
+    usingGateway: API_BASE === GATEWAY_BASE,
+    method: init?.method || 'GET'
+  });
 
   const res = await fetch(url, {
     ...init,

@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -335,6 +336,52 @@ public class AuthController {
                 .body(new AuthDtos.ErrorResponse("GOOGLE_AUTH_ERROR", e.getMessage()));
         } catch (Exception e) {
             logger.error("Error inesperado en callback de Google", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new AuthDtos.ErrorResponse("INTERNAL_ERROR", "Error interno del servidor"));
+        }
+    }
+
+    @GetMapping(
+        path = "/me",
+        produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(
+        summary = "Obtener información del usuario actual",
+        description = "Retorna la información del usuario autenticado actualmente"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Información del usuario obtenida exitosamente",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = AuthDtos.UserInfo.class)
+            )
+        ),
+        @ApiResponse(responseCode = "401", description = "No autenticado o token inválido"),
+        @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
+    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                logger.warn("Intento de acceso a /me sin autenticación válida");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new AuthDtos.ErrorResponse("AUTHENTICATION_ERROR", "No autenticado"));
+            }
+
+            String username = authentication.getName();
+            logger.info("Solicitud de información de usuario actual - Username: {}", username);
+
+            AuthDtos.UserInfo userInfo = authService.getUserInfo(username);
+            logger.info("Información de usuario obtenida exitosamente - UserId: {}", userInfo.userId());
+
+            return ResponseEntity.ok(userInfo);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Usuario no encontrado - Error: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new AuthDtos.ErrorResponse("USER_NOT_FOUND", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error inesperado al obtener información de usuario", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new AuthDtos.ErrorResponse("INTERNAL_ERROR", "Error interno del servidor"));
         }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
@@ -14,7 +14,7 @@ type ResetPasswordResponse = {
   verified: boolean;
 };
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -344,6 +344,29 @@ export default function ResetPasswordPage() {
       
       <Footer />
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-green-50 to-blue-50">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Cargando...</h2>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
 

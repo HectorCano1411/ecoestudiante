@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
     
-    logger.info('route:auth-verify-email', 'outcome', { verified: json.verified });
+    logger.info('route:auth-verify-email', 'outcome', { verified: (json as { verified?: boolean }).verified });
     return NextResponse.json(json);
   } catch (e: any) {
     logger.error('route:auth-verify-email', e);

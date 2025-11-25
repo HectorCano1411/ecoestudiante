@@ -1,6 +1,9 @@
-package com.ecoestudiante.stats;
+package com.ecoestudiante.calc.controller;
 
 import com.ecoestudiante.auth.UserContextResolver;
+import com.ecoestudiante.calc.dto.StatsDtos;
+import com.ecoestudiante.calc.exception.StatsServiceException;
+import com.ecoestudiante.calc.service.StatsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,12 +16,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Controlador REST para Estadísticas de Cálculos CO₂e.
+ * 
+ * Este controlador forma parte del bounded context de Cálculo y proporciona
+ * estadísticas derivadas de los cálculos realizados por el usuario.
+ * 
+ * Ruta base: /api/v1/calc/stats
+ * Movido desde /api/v1/stats como parte de la reorganización arquitectónica.
+ */
 @RestController
-@RequestMapping("/api/v1/stats")
-@Tag(name = "Statistics", description = "Estadísticas de huella de carbono")
+@RequestMapping("/api/v1/calc/stats")
+@Tag(name = "Statistics", description = "Estadísticas de huella de carbono (parte del servicio de cálculo)")
 public class StatsController {
 
     private static final Logger logger = LoggerFactory.getLogger(StatsController.class);
+    private static final String UNKNOWN_USER = "desconocido";
     private final StatsService statsService;
     private final UserContextResolver userContextResolver;
 
@@ -34,14 +47,14 @@ public class StatsController {
     )
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<StatsDtos.StatsSummary> getSummary(HttpServletRequest request) {
+        String userId = extractUserId(request);
         try {
-            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo estadísticas para usuario: {}", userId);
             StatsDtos.StatsSummary summary = statsService.getSummary(userId);
             return ResponseEntity.ok(summary);
         } catch (Exception e) {
-            logger.error("Error al obtener estadísticas", e);
-            throw new RuntimeException("Error al obtener estadísticas", e);
+            // Relanzamos con información contextual (userId) para que el GlobalExceptionHandler la maneje
+            throw new StatsServiceException(String.format("Error al obtener estadísticas para usuario: %s", userId), e);
         }
     }
 
@@ -55,15 +68,16 @@ public class StatsController {
             HttpServletRequest request,
             @RequestParam(value = "categories", required = false) java.util.List<String> categories
     ) {
+        String userId = extractUserId(request);
         try {
-            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo estadísticas por categoría para usuario: {} con {} categorías filtradas", 
                 userId, categories != null ? categories.size() : 0);
             StatsDtos.StatsByCategoryResponse response = statsService.getByCategory(userId, categories);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            logger.error("Error al obtener estadísticas por categoría", e);
-            throw new RuntimeException("Error al obtener estadísticas por categoría", e);
+            // Relanzamos con información contextual (userId, categories) para que el GlobalExceptionHandler la maneje
+            throw new StatsServiceException(String.format("Error al obtener estadísticas por categoría para usuario: %s con %d categorías filtradas", 
+                userId, categories != null ? categories.size() : 0), e);
         }
     }
 
@@ -83,8 +97,8 @@ public class StatsController {
             @RequestParam(value = "day", required = false) Integer day,
             @RequestParam(value = "categories", required = false) java.util.List<String> categories
     ) {
+        String userId = extractUserId(request);
         try {
-            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo datos temporales para usuario: {}, groupBy: {}, months: {}, schedule: {}, career: {}, month: {}, day: {}, categories: {}", 
                 userId, groupBy, months, schedule, career, month, day, categories);
             StatsDtos.TimeSeriesResponse response = statsService.getTimeSeries(
@@ -92,8 +106,9 @@ public class StatsController {
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            logger.error("Error al obtener datos temporales", e);
-            throw new RuntimeException("Error al obtener datos temporales", e);
+            // Relanzamos con información contextual (userId, parámetros) para que el GlobalExceptionHandler la maneje
+            throw new StatsServiceException(String.format("Error al obtener datos temporales para usuario: %s, groupBy: %s, months: %s, schedule: %s, career: %s, month: %s, day: %s", 
+                userId, groupBy, months, schedule, career, month, day), e);
         }
     }
     
@@ -104,14 +119,14 @@ public class StatsController {
     )
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<java.util.List<String>> getAvailableCareers(HttpServletRequest request) {
+        String userId = extractUserId(request);
         try {
-            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Obteniendo carreras disponibles para usuario: {}", userId);
             java.util.List<String> careers = statsService.getAvailableCareers(userId);
             return ResponseEntity.ok(careers);
         } catch (Exception e) {
-            logger.error("Error al obtener carreras disponibles", e);
-            throw new RuntimeException("Error al obtener carreras disponibles", e);
+            // Relanzamos con información contextual (userId) para que el GlobalExceptionHandler la maneje
+            throw new StatsServiceException(String.format("Error al obtener carreras disponibles para usuario: %s", userId), e);
         }
     }
     
@@ -123,8 +138,8 @@ public class StatsController {
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<java.util.Map<String, java.util.List<String>>> getAvailableCategories(HttpServletRequest request) {
         logger.info("=== ENDPOINT /available-categories LLAMADO ===");
+        String userId = extractUserId(request);
         try {
-            String userId = userContextResolver.resolve(request).normalizedUserIdAsString();
             logger.info("Usuario autenticado: {}", userId);
             logger.info("Llamando a statsService.getAvailableCategories...");
             
@@ -142,13 +157,21 @@ public class StatsController {
             logger.info("Retornando respuesta HTTP 200 OK");
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
-            logger.error("=== ERROR EN ENDPOINT /available-categories ===", e);
-            logger.error("Mensaje de error: {}", e.getMessage());
-            logger.error("Tipo de excepción: {}", e.getClass().getName());
-            if (e.getCause() != null) {
-                logger.error("Causa: {}", e.getCause().getMessage());
-            }
-            throw new RuntimeException("Error al obtener categorías disponibles", e);
+            // Relanzamos con información contextual (userId) para que el GlobalExceptionHandler la maneje
+            throw new StatsServiceException(String.format("Error al obtener categorías disponibles para usuario: %s", userId), e);
+        }
+    }
+
+    /**
+     * Extrae el ID de usuario del request de forma segura.
+     * Si falla, retorna un valor por defecto para permitir el logging contextual.
+     */
+    private String extractUserId(HttpServletRequest request) {
+        try {
+            return userContextResolver.resolve(request).normalizedUserIdAsString();
+        } catch (Exception e) {
+            logger.warn("No se pudo extraer el userId del request", e);
+            return UNKNOWN_USER;
         }
     }
 }

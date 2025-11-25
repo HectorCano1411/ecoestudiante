@@ -83,7 +83,7 @@ public class AuthDtos {
     public record ResetPasswordRequest(
             @NotBlank(message = "Token es requerido")
             String token,
-            
+
             @NotBlank(message = "Password es requerido")
             @Size(min = 8, message = "Password debe tener al menos 8 caracteres")
             @Pattern(
@@ -91,6 +91,15 @@ public class AuthDtos {
                 message = "Password debe contener al menos: una mayúscula, una minúscula, un número y un símbolo"
             )
             String password
+    ) {}
+
+    public record UserInfo(
+            String userId,
+            String username,
+            String email,
+            String carrera,
+            String jornada,
+            boolean emailVerified
     ) {}
 }
 
