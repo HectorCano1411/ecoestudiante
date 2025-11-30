@@ -283,6 +283,31 @@ public class MissionServiceImpl implements MissionService {
         return BigDecimal.valueOf(100.0);
     }
 
+    @Override
+    public List<MissionDtos.MissionResponse> getAvailableMissionsForUser(UUID userId, String weekNumber, Integer year) {
+        logger.debug("Obteniendo misiones disponibles para usuario {} en semana {}-{}", userId, weekNumber, year);
+
+        // Obtener todas las misiones de la semana
+        List<Mission> allMissions = missionRepository.findByWeek(weekNumber, year);
+
+        // Obtener las misiones que el usuario ya aceptó (tiene progreso)
+        List<Long> acceptedMissionIds = progressRepository.findAllByUserId(userId).stream()
+                .map(MissionProgress::getMissionId)
+                .collect(Collectors.toList());
+
+        // Filtrar las misiones que NO están en la lista de aceptadas
+        List<Mission> availableMissions = allMissions.stream()
+                .filter(mission -> !acceptedMissionIds.contains(mission.getId()))
+                .collect(Collectors.toList());
+
+        logger.debug("Encontradas {} misiones disponibles de {} totales para usuario {}",
+                availableMissions.size(), allMissions.size(), userId);
+
+        return availableMissions.stream()
+                .map(this::toMissionResponse)
+                .collect(Collectors.toList());
+    }
+
     // =========================================================================
     // Métodos auxiliares
     // =========================================================================

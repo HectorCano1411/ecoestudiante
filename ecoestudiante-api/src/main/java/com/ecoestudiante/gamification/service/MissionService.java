@@ -136,4 +136,14 @@ public interface MissionService {
      * @return Valor promedio de las últimas 4 semanas
      */
     java.math.BigDecimal calculateBaseline(UUID userId, Mission.MissionCategory category);
+
+    /**
+     * Obtiene las misiones disponibles para un usuario (que existen pero no ha aceptado)
+     *
+     * @param userId ID del usuario
+     * @param weekNumber Número de semana ISO (ejemplo: "2025-W01")
+     * @param year Año
+     * @return Lista de misiones disponibles (no aceptadas) para el usuario
+     */
+    List<MissionDtos.MissionResponse> getAvailableMissionsForUser(UUID userId, String weekNumber, Integer year);
 }

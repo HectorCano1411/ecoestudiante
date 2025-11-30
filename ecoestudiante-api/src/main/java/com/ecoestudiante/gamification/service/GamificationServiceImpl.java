@@ -68,17 +68,40 @@ public class GamificationServiceImpl implements GamificationService {
             LocalDateTime monthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
             LocalDateTime monthEnd = LocalDateTime.now().plusMonths(1).withDayOfMonth(1).withHour(0).minusSeconds(1);
             Integer xpThisMonth = xpTransactionRepository.sumXpByUserBetweenDates(userIdUuid, monthStart, monthEnd);
+            
+            // Asegurar que xpThisMonth nunca sea null
+            if (xpThisMonth == null) {
+                xpThisMonth = 0;
+            }
+            
+            // Asegurar que totalXp nunca sea null
+            Long totalXp = profile.getTotalXp();
+            if (totalXp == null) {
+                totalXp = 0L;
+            }
+            
+            // Asegurar que currentLevel nunca sea null
+            Integer currentLevel = profile.getCurrentLevel();
+            if (currentLevel == null) {
+                currentLevel = 1;
+            }
 
-            // Calcular XP necesario para siguiente nivel
-            long nextLevelXp = (long) Math.pow(profile.getCurrentLevel() + 1, 2) * 100;
-            int xpToNextLevel = (int) (nextLevelXp - profile.getTotalXp());
+            // Calcular XP necesario para siguiente nivel (después de validar valores)
+            long nextLevelXp = (long) Math.pow(currentLevel + 1, 2) * 100;
+            int xpToNextLevel = (int) (nextLevelXp - totalXp);
+            
+            // Asegurar que updatedAt nunca sea null
+            LocalDateTime updatedAt = profile.getUpdatedAt();
+            if (updatedAt == null) {
+                updatedAt = LocalDateTime.now();
+            }
 
             return new GamificationDtos.XPBalance(
-                    profile.getTotalXp().intValue(),
-                    profile.getCurrentLevel(),
+                    totalXp.intValue(),
+                    currentLevel,
                     xpToNextLevel > 0 ? xpToNextLevel : 0,
                     xpThisMonth,
-                    profile.getUpdatedAt()
+                    updatedAt
             );
         } catch (Exception e) {
             logger.error("Error al obtener balance de XP para usuario {}: {}", userId, e.getMessage());
@@ -95,10 +118,21 @@ public class GamificationServiceImpl implements GamificationService {
 
             GamificationProfile profile = profileRepository.findByUserId(userIdUuid)
                     .orElseGet(() -> createDefaultProfile(userIdUuid));
+            
+            // Asegurar que los valores nunca sean null
+            Integer currentStreak = profile.getCurrentStreak();
+            if (currentStreak == null) {
+                currentStreak = 0;
+            }
+            
+            Integer bestStreak = profile.getBestStreak();
+            if (bestStreak == null) {
+                bestStreak = 0;
+            }
 
             return new GamificationDtos.StreakInfo(
-                    profile.getCurrentStreak(),
-                    profile.getBestStreak(),
+                    currentStreak,
+                    bestStreak,
                     profile.getLastActivityDate() != null
                             ? profile.getLastActivityDate().atStartOfDay()
                             : null,
@@ -173,6 +207,9 @@ public class GamificationServiceImpl implements GamificationService {
         profile.setCurrentStreak(0);
         profile.setBestStreak(0);
         profile.setLastActivityDate(null);
+        
+        // Establecer updatedAt para evitar null
+        profile.setUpdatedAt(LocalDateTime.now());
 
         return profile;
     }

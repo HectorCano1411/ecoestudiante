@@ -179,12 +179,12 @@ services:
       # Mapbox (para mapas de movilidad)
       NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
       # Auth0 (opcional - solo si están TODAS las variables configuradas)
-      AUTH0_SECRET: ${AUTH0_SECRET:-}
+      AUTH0_SECRET: ${AUTH0_SECRET:-f9741d2930510fc3bf2522e92df69952753398ce5ddd49c8faa96fd166f507d9}
       AUTH0_BASE_URL: ${AUTH0_BASE_URL:-http://localhost:3000}
-      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
-      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-}
-      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:-}
-      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-https://dev-jgqcq4hgk20oblxk.us.auth0.com}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-LtZ88DQsSI3ZG3iP5Qcw4gjuOOR6L28C}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:--P364I8ut_rHk5_xqSs9BGXFvG03t0_21kMtsVRvm3W0piBsIwI5fPsPQ6bLQ6us}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://api.ecoestudiante.com}
     ports:
       - "3000:3000"
     depends_on:

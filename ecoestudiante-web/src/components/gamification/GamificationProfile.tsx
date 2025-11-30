@@ -4,6 +4,15 @@ import { useState, useEffect } from 'react';
 import type { XPBalance, StreakInfo } from '@/types/gamification';
 import { api } from '@/lib/api-client';
 
+// Error handler para evitar crashes silenciosos
+const handleError = (error: unknown, context: string) => {
+  console.error(`[GamificationProfile] Error en ${context}:`, error);
+  if (error instanceof Error) {
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+  }
+};
+
 interface GamificationProfileProps {
   userId?: string;
   compact?: boolean;
@@ -29,18 +38,53 @@ export default function GamificationProfile({
         const xpResponse = await api<XPBalance>('/gam/xp-balance', {
           method: 'GET'
         });
-        setXpData(xpResponse);
+        // Validar que la respuesta tenga la estructura esperada
+        if (xpResponse && typeof xpResponse === 'object') {
+          setXpData(xpResponse);
+        } else {
+          // Si la respuesta no es válida, usar valores por defecto
+          setXpData({
+            totalXp: 0,
+            currentLevel: 1,
+            xpToNextLevel: 100,
+            xpThisMonth: 0,
+            updatedAt: new Date().toISOString()
+          });
+        }
 
         // Obtener streaks
         const streakResponse = await api<StreakInfo>('/gam/streaks', {
           method: 'GET'
         });
-        setStreakData(streakResponse);
+        // Validar que la respuesta tenga la estructura esperada
+        if (streakResponse && typeof streakResponse === 'object') {
+          setStreakData(streakResponse);
+        } else {
+          // Si la respuesta no es válida, usar valores por defecto
+          setStreakData({
+            currentStreak: 0,
+            bestStreak: 0,
+            streakType: 'WEEKLY'
+          });
+        }
 
       } catch (err: unknown) {
+        handleError(err, 'fetchData');
         const errorMessage = err instanceof Error ? err.message : 'Error al cargar perfil';
         setError(errorMessage);
-        console.error('Error al cargar perfil de gamificación:', err);
+        // En caso de error, usar valores por defecto para evitar pantalla negra
+        setXpData({
+          totalXp: 0,
+          currentLevel: 1,
+          xpToNextLevel: 100,
+          xpThisMonth: 0,
+          updatedAt: new Date().toISOString()
+        });
+        setStreakData({
+          currentStreak: 0,
+          bestStreak: 0,
+          streakType: 'WEEKLY'
+        });
       } finally {
         setLoading(false);
       }
@@ -106,11 +150,36 @@ export default function GamificationProfile({
     return null;
   }
 
-  const xpProgress = ((xpData.totalXp % Math.pow(xpData.currentLevel + 1, 2) * 100) / xpData.xpToNextLevel) * 100;
-  const levelTitle = getLevelTitle(xpData.currentLevel);
-  const levelColor = getLevelColor(xpData.currentLevel);
-  const levelEmoji = getLevelEmoji(xpData.currentLevel);
-  const streakEmoji = getStreakEmoji(streakData?.currentStreak || 0);
+  // Valores por defecto para prevenir errores con undefined/null
+  const totalXp = xpData.totalXp ?? 0;
+  const currentLevel = xpData.currentLevel ?? 1;
+  const xpToNextLevel = xpData.xpToNextLevel ?? 100;
+  const xpThisMonth = xpData.xpThisMonth ?? 0;
+  const currentStreak = streakData?.currentStreak ?? 0;
+  const bestStreak = streakData?.bestStreak ?? 0;
+
+  // Calcular progreso de manera segura
+  // Fórmula simplificada: Progreso = (XP actual / XP necesario para siguiente nivel) * 100
+  // Pero limitado al rango del nivel actual
+  let xpProgress = 0;
+  try {
+    if (xpToNextLevel > 0 && totalXp > 0) {
+      // XP necesario para el nivel actual = (nivel^2 * 100)
+      const xpForCurrentLevel = Math.pow(Math.max(1, currentLevel), 2) * 100;
+      // XP acumulado en el nivel actual
+      const xpInCurrentLevel = Math.max(0, totalXp - xpForCurrentLevel);
+      // Porcentaje de progreso
+      const progressPercent = (xpInCurrentLevel / xpToNextLevel) * 100;
+      xpProgress = Math.min(100, Math.max(0, progressPercent));
+    }
+  } catch (calcError) {
+    console.error('Error calculando progreso de XP:', calcError);
+    xpProgress = 0;
+  }
+  const levelTitle = getLevelTitle(currentLevel);
+  const levelColor = getLevelColor(currentLevel);
+  const levelEmoji = getLevelEmoji(currentLevel);
+  const streakEmoji = getStreakEmoji(currentStreak);
 
   if (compact) {
     return (
@@ -122,7 +191,7 @@ export default function GamificationProfile({
             flex flex-col items-center justify-center text-white shadow-lg
           `}>
             <span className="text-xl">{levelEmoji}</span>
-            <span className="text-xs font-bold">{xpData.currentLevel}</span>
+            <span className="text-xs font-bold">{currentLevel}</span>
           </div>
 
           {/* Info rápida */}
@@ -131,15 +200,15 @@ export default function GamificationProfile({
               {levelTitle}
             </h3>
             <p className="text-xs text-gray-600 mb-1">
-              {xpData.totalXp.toLocaleString()} XP
+              {(totalXp ?? 0).toLocaleString()} XP
             </p>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-orange-600 font-semibold">
-                {streakEmoji} {streakData?.currentStreak || 0}
+                {streakEmoji} {currentStreak}
               </span>
               <span className="text-gray-400">•</span>
               <span className="text-green-600 font-semibold">
-                +{xpData.xpThisMonth} XP mes
+                +{(xpThisMonth ?? 0).toLocaleString()} XP mes
               </span>
             </div>
           </div>
@@ -170,7 +239,7 @@ export default function GamificationProfile({
             </div>
             <div>
               <h2 className="text-2xl font-bold mb-1">
-                Nivel {xpData.currentLevel}
+                Nivel {currentLevel}
               </h2>
               <p className="text-sm opacity-90 font-medium">
                 {levelTitle}
@@ -182,16 +251,16 @@ export default function GamificationProfile({
           <div className="mt-4">
             <div className="flex items-center justify-between text-xs mb-2">
               <span className="font-medium opacity-90">
-                {xpData.totalXp.toLocaleString()} XP
+                {(totalXp ?? 0).toLocaleString()} XP
               </span>
               <span className="font-bold">
-                {xpData.xpToNextLevel} XP para nivel {xpData.currentLevel + 1}
+                {(xpToNextLevel ?? 100).toLocaleString()} XP para nivel {(currentLevel ?? 1) + 1}
               </span>
             </div>
             <div className="w-full bg-white/30 rounded-full h-3 overflow-hidden backdrop-blur-sm">
               <div
                 className="h-3 bg-white rounded-full transition-all duration-500 shadow-lg"
-                style={{ width: `${Math.min(100, xpProgress)}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, isNaN(xpProgress) ? 0 : xpProgress))}%` }}
               />
             </div>
           </div>
@@ -209,10 +278,10 @@ export default function GamificationProfile({
                 <span className="text-xs font-semibold text-gray-600">RACHA ACTUAL</span>
               </div>
               <p className="text-2xl font-bold text-orange-600">
-                {streakData?.currentStreak || 0}
+                {currentStreak}
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                {streakData?.currentStreak === 1 ? 'semana' : 'semanas'} consecutivas
+                {currentStreak === 1 ? 'semana' : 'semanas'} consecutivas
               </p>
             </div>
 
@@ -223,7 +292,7 @@ export default function GamificationProfile({
                 <span className="text-xs font-semibold text-gray-600">MEJOR RACHA</span>
               </div>
               <p className="text-2xl font-bold text-purple-600">
-                {streakData?.bestStreak || 0}
+                {bestStreak}
               </p>
               <p className="text-xs text-gray-600 mt-1">
                 récord personal
@@ -237,7 +306,7 @@ export default function GamificationProfile({
                 <span className="text-xs font-semibold text-gray-600">XP ESTE MES</span>
               </div>
               <p className="text-2xl font-bold text-green-600">
-                +{xpData.xpThisMonth.toLocaleString()}
+                +{(xpThisMonth ?? 0).toLocaleString()}
               </p>
               <p className="text-xs text-gray-600 mt-1">
                 experiencia ganada
@@ -251,7 +320,7 @@ export default function GamificationProfile({
                 <span className="text-xs font-semibold text-gray-600">XP TOTAL</span>
               </div>
               <p className="text-2xl font-bold text-blue-600">
-                {xpData.totalXp.toLocaleString()}
+                {(totalXp ?? 0).toLocaleString()}
               </p>
               <p className="text-xs text-gray-600 mt-1">
                 experiencia acumulada
@@ -281,12 +350,16 @@ export default function GamificationProfile({
       {/* Footer con última actualización */}
       <div className="border-t border-gray-200 px-6 py-3 bg-gray-50">
         <p className="text-xs text-gray-500 text-center">
-          Actualizado: {new Date(xpData.updatedAt).toLocaleDateString('es-CL', {
-            day: 'numeric',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
+          {xpData.updatedAt ? (
+            <>Actualizado: {new Date(xpData.updatedAt).toLocaleDateString('es-CL', {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</>
+          ) : (
+            'Datos actualizados'
+          )}
         </p>
       </div>
     </div>

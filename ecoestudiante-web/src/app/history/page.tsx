@@ -12,7 +12,7 @@ type SortField = 'date' | 'emission' | 'category' | 'subcategory';
 type SortOrder = 'asc' | 'desc';
 
 export default function HistoryPage() {
-  const { user: auth0User, isLoading: auth0Loading } = useUser();
+  const { user: auth0User } = useUser();
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<CalcHistoryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +23,6 @@ export default function HistoryPage() {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const pageSize = 20;
 
   // Filtros PENDIENTES (lo que el usuario está editando)

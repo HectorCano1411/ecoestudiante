@@ -92,6 +92,45 @@ public class MissionController {
     }
 
     /**
+     * Obtiene las misiones disponibles para el usuario actual (no aceptadas)
+     */
+    @GetMapping(path = "/available", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Listar misiones disponibles",
+            description = "Retorna las misiones de la semana actual que el usuario aún no ha aceptado"
+    )
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Misiones disponibles obtenidas exitosamente",
+                    content = @Content(schema = @Schema(implementation = MissionDtos.MissionsListResponse.class))),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "500", description = "Error interno")
+    })
+    public ResponseEntity<MissionDtos.MissionsListResponse> getAvailableMissions(HttpServletRequest request) {
+        try {
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
+            String[] currentWeek = getCurrentWeekAndYear();
+            
+            logger.info("Obteniendo misiones disponibles para usuario {} en semana {}", userId, currentWeek[0]);
+            
+            List<MissionDtos.MissionResponse> availableMissions = missionService.getAvailableMissionsForUser(
+                    userId, currentWeek[0], Integer.parseInt(currentWeek[1])
+            );
+
+            MissionDtos.MissionsListResponse response = new MissionDtos.MissionsListResponse(
+                    availableMissions,
+                    availableMissions.size(),
+                    currentWeek[0]
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error al obtener misiones disponibles", e);
+            throw new RuntimeException("Error al obtener misiones disponibles", e);
+        }
+    }
+
+    /**
      * Obtiene el progreso del usuario en sus misiones
      */
     @GetMapping(path = "/my-progress", produces = MediaType.APPLICATION_JSON_VALUE)

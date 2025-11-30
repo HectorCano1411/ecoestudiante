@@ -39,8 +39,8 @@ export default function GamificationDemoPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Obtener misiones disponibles
-        const missionsData = await api<MissionsResponse>('/gam/missions', { method: 'GET' });
+        // Obtener misiones disponibles (no aceptadas)
+        const missionsData = await api<MissionsResponse>('/gam/missions/available', { method: 'GET' });
         setMissions(missionsData.missions || []);
 
         // Obtener mi progreso
@@ -66,6 +66,10 @@ export default function GamificationDemoPage() {
       // Recargar datos
       const progressData = await api<MyProgressResponse>('/gam/missions/my-progress', { method: 'GET' });
       setMyProgress(progressData);
+      
+      // Recargar misiones disponibles
+      const missionsData = await api<MissionsResponse>('/gam/missions/available', { method: 'GET' });
+      setMissions(missionsData.missions || []);
 
       alert('¡Misión aceptada con éxito! 🚀');
     } catch (error) {

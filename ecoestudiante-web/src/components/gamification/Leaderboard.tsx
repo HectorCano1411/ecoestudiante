@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { LeaderboardResponse, LeaderboardEntry } from '@/types/gamification';
 import { api } from '@/lib/api-client';
 
@@ -24,7 +24,7 @@ export default function Leaderboard({
   const [error, setError] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<string>('current');
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       setError(null);
       const endpoint = selectedWeek === 'current'
@@ -43,7 +43,7 @@ export default function Leaderboard({
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedWeek, topN]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -52,7 +52,7 @@ export default function Leaderboard({
       const interval = setInterval(fetchLeaderboard, refreshInterval * 1000);
       return () => clearInterval(interval);
     }
-  }, [selectedWeek, topN]);
+  }, [fetchLeaderboard, autoRefresh, refreshInterval]);
 
   const getMedalEmoji = (position: number): string => {
     switch (position) {
@@ -63,7 +63,8 @@ export default function Leaderboard({
     }
   };
 
-  const formatCO2 = (kg: number): string => {
+  const formatCO2 = (kg: number | undefined): string => {
+    if (!kg && kg !== 0) return '0 kg';
     if (kg >= 1000) {
       return `${(kg / 1000).toFixed(2)} t`;
     }
@@ -92,15 +93,15 @@ export default function Leaderboard({
               {isCurrentUser ? '✨ ' : ''}{entry.username}
             </p>
             <p className="text-xs text-gray-600">
-              {formatCO2(entry.co2AvoidedKg)} CO₂ evitado
+              {formatCO2(entry.co2AvoidedKg ?? 0)} CO₂ evitado
             </p>
           </div>
           <div className="text-right">
             <p className="text-xs font-bold text-green-600">
-              {entry.totalXpWeek} XP
+              {(entry.totalXpWeek ?? 0).toLocaleString()} XP
             </p>
             <p className="text-xs text-gray-500">
-              {entry.missionsCompleted} misiones
+              {entry.missionsCompleted ?? 0} misiones
             </p>
           </div>
         </div>
@@ -145,19 +146,19 @@ export default function Leaderboard({
             <div>
               <p className="text-xs text-gray-500">CO₂ evitado</p>
               <p className="font-bold text-green-600">
-                {formatCO2(entry.co2AvoidedKg)}
+                {formatCO2(entry.co2AvoidedKg ?? 0)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Misiones</p>
               <p className="font-semibold text-blue-600">
-                {entry.missionsCompleted}
+                {entry.missionsCompleted ?? 0}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-500">XP Semanal</p>
               <p className="font-semibold text-purple-600">
-                {entry.totalXpWeek}
+                {(entry.totalXpWeek ?? 0).toLocaleString()}
               </p>
             </div>
           </div>
@@ -225,11 +226,11 @@ export default function Leaderboard({
               🏆 Ranking Semanal
             </h2>
             <p className="text-sm opacity-90">
-              Semana {data.weekNumber} • {data.year}
+              Semana {data.weekNumber ?? 'N/A'} • {data.year ?? new Date().getFullYear()}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold">{data.totalUsers}</p>
+            <p className="text-3xl font-bold">{(data.totalUsers ?? 0).toLocaleString()}</p>
             <p className="text-xs opacity-90">participantes</p>
           </div>
         </div>

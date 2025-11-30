@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import DashboardMenu from '@/components/DashboardMenu';
@@ -11,10 +10,9 @@ import WasteForm from '@/components/WasteForm';
 import { GamificationProfile, Leaderboard, MissionCard } from '@/components/gamification';
 import { api } from '@/lib/api-client';
 import type { StatsSummary } from '@/types/calc';
-import type { XPBalance, Mission, MissionProgress } from '@/types/gamification';
+import type { XPBalance, Mission, MissionProgress, MissionStatus } from '@/types/gamification';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { user: auth0User, isLoading: auth0Loading } = useUser();
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +22,25 @@ export default function DashboardPage() {
   const [authMethod, setAuthMethod] = useState<'jwt' | 'auth0' | null>(null);
   const [xpBalance, setXpBalance] = useState<XPBalance | null>(null);
   const [activeMissions, setActiveMissions] = useState<Array<{ mission: Mission; progress: MissionProgress }>>([]);
+  const [availableMissions, setAvailableMissions] = useState<Mission[]>([]);
+  const [completedMissions, setCompletedMissions] = useState<Array<{ mission: Mission; progress: MissionProgress }>>([]);
   const [loadingMissions, setLoadingMissions] = useState(false);
+
+  // Tipo para la respuesta del backend que incluye mission dentro de progress
+  interface MissionProgressWithMission {
+    id: number;
+    missionId: number;
+    mission: Mission;
+    status: string;
+    currentProgress: number;
+    targetProgress: number;
+    completionPercentage: number;
+    startedAt?: string;
+    completedAt?: string;
+    expiresAt?: string;
+    baselineValue?: number;
+    statusLabel?: string;
+  }
 
   useEffect(() => {
     // ========================================================================
@@ -72,21 +88,88 @@ export default function DashboardPage() {
     } finally {
       setLoadingStats(false);
     }
-  }, [authMethod]);
+  }, []);
 
   const loadGamificationData = useCallback(async () => {
     try {
+      setLoadingMissions(true);
+      
       // Cargar XP balance
       const xpData = await api<XPBalance>('/gam/xp-balance', { method: 'GET' });
       setXpBalance(xpData);
 
-      // Cargar misiones activas
-      const missionsData = await api<{ activeMissions?: Array<{ mission: Mission; progress: MissionProgress }> }>('/gam/missions/my-progress', { method: 'GET' });
-      setActiveMissions(missionsData.activeMissions || []);
+      // Cargar misiones disponibles (no aceptadas)
+      try {
+        const availableData = await api<{ missions?: Mission[] }>('/gam/missions/available', { method: 'GET' });
+        setAvailableMissions(availableData.missions || []);
+      } catch (error) {
+        console.error('Error cargando misiones disponibles:', error);
+        setAvailableMissions([]);
+      }
+
+      // Cargar progreso de misiones (activas, completadas, expiradas)
+      // El backend devuelve: { active: [], completed: [], expired: [] }
+      // Cada elemento es MissionProgressResponse que incluye: { id, missionId, mission: {...}, status, currentProgress, ... }
+      const missionsData = await api<{
+        active?: MissionProgressWithMission[];
+        completed?: MissionProgressWithMission[];
+        expired?: MissionProgressWithMission[];
+      }>('/gam/missions/my-progress', { method: 'GET' });
+      
+      // Convertir al formato que espera el componente MissionCard
+      setActiveMissions((missionsData.active || []).map((item: MissionProgressWithMission) => ({
+        mission: item.mission,
+        progress: {
+          id: item.id,
+          missionId: item.missionId,
+          userId: 0,
+          status: item.status as MissionStatus,
+          currentProgress: item.currentProgress || 0,
+          targetValue: item.targetProgress || item.mission.targetValue || 0,
+          completionPercent: item.completionPercentage || 0,
+          startedAt: item.startedAt || new Date().toISOString(),
+          completedAt: item.completedAt,
+          expiresAt: item.completedAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 días desde ahora
+        } as MissionProgress
+      })));
+      
+      setCompletedMissions((missionsData.completed || []).map((item: MissionProgressWithMission) => ({
+        mission: item.mission,
+        progress: {
+          id: item.id,
+          missionId: item.missionId,
+          userId: 0,
+          status: item.status as MissionStatus,
+          currentProgress: item.currentProgress || 0,
+          targetValue: item.targetProgress || item.mission.targetValue || 0,
+          completionPercent: item.completionPercentage || 100,
+          startedAt: item.startedAt || new Date().toISOString(),
+          completedAt: item.completedAt || new Date().toISOString(),
+          expiresAt: item.completedAt || new Date().toISOString(),
+        } as MissionProgress
+      })));
     } catch (error) {
       console.error('Error cargando datos de gamificación:', error);
+    } finally {
+      setLoadingMissions(false);
     }
   }, []);
+
+  const handleCalculationSuccess = useCallback(async () => {
+    // Recargar estadísticas
+    await loadStats();
+    
+    // Verificar y actualizar misiones después de un cálculo
+    try {
+      await api('/gam/missions/check', { method: 'POST' });
+      console.log('Misiones verificadas y actualizadas');
+    } catch (error) {
+      console.error('Error verificando misiones:', error);
+    }
+    
+    // Recargar datos de gamificación para ver el progreso actualizado
+    await loadGamificationData();
+  }, [loadStats, loadGamificationData]);
 
   const handleAcceptMission = async (missionId: number) => {
     try {
@@ -94,10 +177,12 @@ export default function DashboardPage() {
         method: 'POST',
         body: JSON.stringify({ missionId })
       });
-      loadGamificationData();
+      // Recargar todos los datos de gamificación
+      await loadGamificationData();
       alert('¡Misión aceptada con éxito! 🚀');
     } catch (error) {
       console.error('Error al aceptar misión:', error);
+      alert('Error al aceptar la misión. Intenta nuevamente.');
     }
   };
 
@@ -129,6 +214,14 @@ export default function DashboardPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, authMethod]);
+
+  useEffect(() => {
+    // Recargar misiones cuando se cambia a la sección de misiones
+    if (activeSection === 'missions' && !loading && authMethod) {
+      loadGamificationData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, loading, authMethod]);
 
   const handleLogout = () => {
     if (authMethod === 'auth0') {
@@ -353,7 +446,7 @@ export default function DashboardPage() {
               </p>
             </div>
             
-            <ElectricityForm onSuccess={loadStats} />
+            <ElectricityForm onSuccess={handleCalculationSuccess} />
           </div>
         ) : activeSection === 'transport' ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
@@ -369,7 +462,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <TransportForm onSuccess={loadStats} />
+            <TransportForm onSuccess={handleCalculationSuccess} />
           </div>
         ) : activeSection === 'waste' ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
@@ -385,7 +478,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <WasteForm onSuccess={loadStats} />
+            <WasteForm onSuccess={handleCalculationSuccess} />
           </div>
         ) : activeSection === 'missions' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -396,39 +489,89 @@ export default function DashboardPage() {
 
             {/* Columna derecha - Misiones */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Misiones Activas */}
-              {activeMissions.length > 0 ? (
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-4">
-                    Misiones Activas ({activeMissions.length})
-                  </h3>
-                  <div className="space-y-4">
-                    {activeMissions.map((item) => (
-                      <MissionCard
-                        key={item.mission.id}
-                        mission={item.mission}
-                        progress={item.progress}
-                        onComplete={handleCompleteMission}
-                      />
-                    ))}
-                  </div>
+              {loadingMissions ? (
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-12 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-green-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Cargando misiones...</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border-2 border-gray-200 p-12 text-center">
-                  <span className="text-6xl mb-4 block">🎯</span>
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">
-                    No tienes misiones activas
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    Completa cálculos de huella de carbono para desbloquear misiones
-                  </p>
-                  <button
-                    onClick={() => setActiveSection('menu')}
-                    className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                  >
-                    Ir a Calcular
-                  </button>
-                </div>
+                <>
+                  {/* Misiones Disponibles */}
+                  {availableMissions.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">
+                        ⭐ Misiones Disponibles ({availableMissions.length})
+                      </h3>
+                      <div className="space-y-4">
+                        {availableMissions.map((mission) => (
+                          <MissionCard
+                            key={mission.id}
+                            mission={mission}
+                            onAccept={handleAcceptMission}
+                            compact={false}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Misiones Activas */}
+                  {activeMissions.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">
+                        🎯 Misiones Activas ({activeMissions.length})
+                      </h3>
+                      <div className="space-y-4">
+                        {activeMissions.map((item) => (
+                          <MissionCard
+                            key={item.mission.id}
+                            mission={item.mission}
+                            progress={item.progress}
+                            onComplete={handleCompleteMission}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Misiones Completadas */}
+                  {completedMissions.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-4">
+                        ✅ Misiones Completadas ({completedMissions.length})
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {completedMissions.map((item) => (
+                          <MissionCard
+                            key={item.mission.id}
+                            mission={item.mission}
+                            progress={item.progress}
+                            compact={true}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mensaje si no hay misiones */}
+                  {availableMissions.length === 0 && activeMissions.length === 0 && completedMissions.length === 0 && (
+                    <div className="bg-white rounded-xl border-2 border-gray-200 p-12 text-center">
+                      <span className="text-6xl mb-4 block">🎯</span>
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">
+                        No tienes misiones activas
+                      </h3>
+                      <p className="text-gray-600 mb-4">
+                        Completa cálculos de huella de carbono para desbloquear misiones
+                      </p>
+                      <button
+                        onClick={() => setActiveSection('menu')}
+                        className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                      >
+                        Ir a Calcular
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

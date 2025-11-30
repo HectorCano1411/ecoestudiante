@@ -308,7 +308,7 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
         try {
           const meResponse = await api<{ userId: string }>('/auth/me');
           userId = meResponse.userId;
-        } catch (authError) {
+        } catch {
           throw new Error('Usuario no autenticado. Por favor, inicia sesión nuevamente.');
         }
       }

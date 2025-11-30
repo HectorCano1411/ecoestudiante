@@ -65,10 +65,8 @@ const nextConfig: NextConfig = {
         source: '/api/auth/forgot-password',
         destination: 'http://localhost:8888/api/v1/auth/forgot-password', // Gateway
       },
-      {
-        source: '/api/auth/reset-password',
-        destination: 'http://localhost:8888/api/v1/auth/reset-password', // Gateway
-      },
+      // NOTA: /api/auth/reset-password tiene un route handler específico (route.ts)
+      // No necesita rewrite ya que el route handler lo maneja directamente
       {
         source: '/api/stats/:path*',
         destination: 'http://localhost:8888/api/v1/calc/stats/:path*', // Gateway + nueva ruta

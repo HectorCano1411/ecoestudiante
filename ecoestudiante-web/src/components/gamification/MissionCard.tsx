@@ -154,6 +154,30 @@ export default function MissionCard({
             </div>
           </div>
         )}
+
+        {/* Botón de acción en modo compact */}
+        {(canAccept || canComplete) && (
+          <button
+            onClick={handleAction}
+            disabled={loading}
+            className={`
+              w-full mt-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all
+              ${canComplete ?
+                'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700' :
+                'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
+              }
+              disabled:opacity-50 disabled:cursor-not-allowed
+            `}
+          >
+            {loading ? (
+              'Procesando...'
+            ) : canComplete ? (
+              '¡Completar! 🎯'
+            ) : (
+              'Aceptar 🚀'
+            )}
+          </button>
+        )}
       </div>
     );
   }
