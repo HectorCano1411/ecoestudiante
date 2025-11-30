@@ -2,6 +2,7 @@ package com.ecoestudiante.calc.service;
 
 import com.ecoestudiante.auth.TokenUtil;
 import com.ecoestudiante.calc.dto.CalcDtos;
+import com.ecoestudiante.gamification.service.GamificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,10 +23,12 @@ public class CalcServiceImpl implements CalcService {
   private static final Logger logger = LoggerFactory.getLogger(CalcServiceImpl.class);
   private final JdbcTemplate jdbc;
   private final TokenUtil tokenUtil;
+  private final GamificationService gamificationService;
 
-  public CalcServiceImpl(JdbcTemplate jdbc, TokenUtil tokenUtil) {
+  public CalcServiceImpl(JdbcTemplate jdbc, TokenUtil tokenUtil, GamificationService gamificationService) {
     this.jdbc = jdbc;
     this.tokenUtil = tokenUtil;
+    this.gamificationService = gamificationService;
   }
 
   /**
@@ -175,6 +178,15 @@ public class CalcServiceImpl implements CalcService {
           """,
           UUID.randomUUID(), calcId, factorSnapshot
       );
+
+      // Otorgar XP por completar cálculo
+      try {
+        gamificationService.awardXP(in.userId(), 10, "CALCULATION");
+        logger.debug("XP otorgado exitosamente para cálculo de electricidad - userId: {}", in.userId());
+      } catch (Exception e) {
+        logger.warn("Error otorgando XP para cálculo de electricidad - userId: {}", in.userId(), e);
+        // No fallar el cálculo si falla la gamificación
+      }
 
       return new CalcDtos.CalcResult(calcId.toString(), kg, factorHash);
 
@@ -389,6 +401,15 @@ public class CalcServiceImpl implements CalcService {
           UUID.randomUUID(), calcId, factorSnapshot
       );
 
+      // Otorgar XP por completar cálculo
+      try {
+        gamificationService.awardXP(in.userId(), 10, "CALCULATION");
+        logger.debug("XP otorgado exitosamente para cálculo de transporte - userId: {}", in.userId());
+      } catch (Exception e) {
+        logger.warn("Error otorgando XP para cálculo de transporte - userId: {}", in.userId(), e);
+        // No fallar el cálculo si falla la gamificación
+      }
+
       return new CalcDtos.CalcResult(calcId.toString(), kg, factorHash);
 
     } catch (DataIntegrityViolationException dup) {
@@ -600,6 +621,15 @@ public class CalcServiceImpl implements CalcService {
           """,
           UUID.randomUUID(), calcId, factorSnapshot
       );
+
+      // Otorgar XP por completar cálculo
+      try {
+        gamificationService.awardXP(in.userId(), 10, "CALCULATION");
+        logger.debug("XP otorgado exitosamente para cálculo de residuos - userId: {}", in.userId());
+      } catch (Exception e) {
+        logger.warn("Error otorgando XP para cálculo de residuos - userId: {}", in.userId(), e);
+        // No fallar el cálculo si falla la gamificación
+      }
 
       return new CalcDtos.CalcResult(calcId.toString(), totalKg, combinedHash);
 
