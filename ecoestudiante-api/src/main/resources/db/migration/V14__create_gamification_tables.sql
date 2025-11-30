@@ -19,7 +19,7 @@
 
 CREATE TABLE gamification_profiles (
     id                  BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT NOT NULL UNIQUE,
+    user_id             UUID NOT NULL UNIQUE,
     total_xp            BIGINT NOT NULL DEFAULT 0 CHECK (total_xp >= 0),
     current_level       INTEGER NOT NULL DEFAULT 1 CHECK (current_level >= 1),
     current_streak      INTEGER NOT NULL DEFAULT 0 CHECK (current_streak >= 0),
@@ -28,10 +28,10 @@ CREATE TABLE gamification_profiles (
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    -- Foreign Key a users
+    -- Foreign Key a app_user
     CONSTRAINT fk_gamification_profile_user
         FOREIGN KEY (user_id)
-        REFERENCES users(id)
+        REFERENCES app_user(id)
         ON DELETE CASCADE
 );
 
@@ -110,7 +110,7 @@ CREATE TYPE mission_status AS ENUM ('ACTIVE', 'COMPLETED', 'EXPIRED', 'FAILED');
 
 CREATE TABLE mission_progress (
     id                  BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT NOT NULL,
+    user_id             UUID NOT NULL,
     mission_id          BIGINT NOT NULL,
 
     -- Progreso
@@ -130,7 +130,7 @@ CREATE TABLE mission_progress (
     -- Foreign Keys
     CONSTRAINT fk_mission_progress_user
         FOREIGN KEY (user_id)
-        REFERENCES users(id)
+        REFERENCES app_user(id)
         ON DELETE CASCADE,
 
     CONSTRAINT fk_mission_progress_mission
@@ -165,7 +165,7 @@ CREATE TYPE xp_source AS ENUM ('MISSION_COMPLETE', 'CALCULATION', 'STREAK_BONUS'
 
 CREATE TABLE xp_transactions (
     id                  BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT NOT NULL,
+    user_id             UUID NOT NULL,
     amount              INTEGER NOT NULL CHECK (amount != 0), -- Puede ser negativo (penalizaciones)
     source              xp_source NOT NULL,
 
@@ -180,7 +180,7 @@ CREATE TABLE xp_transactions (
     -- Foreign Key
     CONSTRAINT fk_xp_transaction_user
         FOREIGN KEY (user_id)
-        REFERENCES users(id)
+        REFERENCES app_user(id)
         ON DELETE CASCADE
 );
 
@@ -202,7 +202,7 @@ COMMENT ON COLUMN xp_transactions.reference_id IS 'ID del registro origen (misi√
 
 CREATE TABLE leaderboard_cache (
     id                  BIGSERIAL PRIMARY KEY,
-    user_id             BIGINT NOT NULL,
+    user_id             UUID NOT NULL,
     week_number         VARCHAR(10) NOT NULL, -- '2025-W01'
     year                INTEGER NOT NULL,
 
@@ -220,7 +220,7 @@ CREATE TABLE leaderboard_cache (
     -- Foreign Key
     CONSTRAINT fk_leaderboard_cache_user
         FOREIGN KEY (user_id)
-        REFERENCES users(id)
+        REFERENCES app_user(id)
         ON DELETE CASCADE,
 
     -- Constraint: Un usuario solo puede estar una vez por semana

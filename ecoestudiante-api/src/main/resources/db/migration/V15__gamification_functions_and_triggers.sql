@@ -189,7 +189,7 @@ SELECT
     lc.week_number,
     lc.year
 FROM leaderboard_cache lc
-INNER JOIN users u ON lc.user_id = u.id
+INNER JOIN app_user u ON lc.user_id = u.id
 WHERE lc.week_number = get_current_iso_week()
   AND lc.year = get_current_iso_year()
 ORDER BY lc.rank_position ASC
@@ -232,7 +232,7 @@ SELECT
     gp.created_at,
     gp.updated_at
 FROM gamification_profiles gp
-INNER JOIN users u ON gp.user_id = u.id;
+INNER JOIN app_user u ON gp.user_id = u.id;
 
 COMMENT ON VIEW v_gamification_profile_extended IS 'Vista extendida con título, progreso y multiplicador calculados';
 
