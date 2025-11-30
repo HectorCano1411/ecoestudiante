@@ -106,8 +106,8 @@ public class GoogleOAuth2UserService {
     }
 
     public AuthDtos.AuthResponse generateAuthResponse(AppUser user) {
-        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString());
+        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), user.getRole());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), user.getRole());
 
         return new AuthDtos.AuthResponse(
             accessToken,
@@ -115,7 +115,8 @@ public class GoogleOAuth2UserService {
             user.getUsername(),
             user.getId().toString(),
             user.getEmail(),
-            refreshToken
+            refreshToken,
+            user.getRole()  // Incluir rol en la respuesta
         );
     }
 }

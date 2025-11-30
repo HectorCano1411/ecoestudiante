@@ -45,35 +45,35 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://localhost:8888/api/v1/:path*', // Gateway, no backend directo
+        destination: 'http://gateway:8080/api/v1/:path*', // Gateway interno Docker
       },
       // NO reescribir /api/auth/[...auth0]/* - Auth0 lo maneja
       // Solo reescribir rutas específicas del backend JWT (a través del Gateway)
       {
         source: '/api/auth/jwt-login',
-        destination: 'http://localhost:8888/api/v1/auth/login', // Gateway
+        destination: 'http://gateway:8080/api/v1/auth/login', // Gateway interno Docker
       },
       {
         source: '/api/auth/register',
-        destination: 'http://localhost:8888/api/v1/auth/register', // Gateway
+        destination: 'http://gateway:8080/api/v1/auth/register', // Gateway interno Docker
       },
       {
         source: '/api/auth/verify-email',
-        destination: 'http://localhost:8888/api/v1/auth/verify-email', // Gateway
+        destination: 'http://gateway:8080/api/v1/auth/verify-email', // Gateway interno Docker
       },
       {
         source: '/api/auth/forgot-password',
-        destination: 'http://localhost:8888/api/v1/auth/forgot-password', // Gateway
+        destination: 'http://gateway:8080/api/v1/auth/forgot-password', // Gateway interno Docker
       },
       // NOTA: /api/auth/reset-password tiene un route handler específico (route.ts)
       // No necesita rewrite ya que el route handler lo maneja directamente
       {
         source: '/api/stats/:path*',
-        destination: 'http://localhost:8888/api/v1/calc/stats/:path*', // Gateway + nueva ruta
+        destination: 'http://gateway:8080/api/v1/calc/stats/:path*', // Gateway interno Docker
       },
       {
         source: '/api/calc/:path*',
-        destination: 'http://localhost:8888/api/v1/calc/:path*', // Gateway
+        destination: 'http://gateway:8080/api/v1/calc/:path*', // Gateway interno Docker
       },
     ];
   },

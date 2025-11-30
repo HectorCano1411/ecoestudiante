@@ -21,5 +21,20 @@ public class AppUser {
     private String googleId;
     private String authProvider; // 'local', 'google'
     private String pictureUrl;
+    private String role; // 'STUDENT', 'ADMIN', 'MODERATOR'
+
+    /**
+     * Verifica si el usuario tiene rol de administrador
+     */
+    public boolean isAdmin() {
+        return "ADMIN".equalsIgnoreCase(this.role);
+    }
+
+    /**
+     * Verifica si el usuario tiene rol de moderador
+     */
+    public boolean isModerator() {
+        return "MODERATOR".equalsIgnoreCase(this.role);
+    }
 }
 

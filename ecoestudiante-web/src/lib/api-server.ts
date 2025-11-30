@@ -36,12 +36,19 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
     let errorMessage = `${res.status}: ${res.statusText}`;
     try {
       const errorBody = await res.clone().json();
-      if (errorBody.message) {
-        errorMessage = errorBody.message;
-      } else if (errorBody.error) {
+      // El ErrorResponse tiene estructura: { error: { code, message, correlationId, details } }
+      if (errorBody.error && errorBody.error.message) {
+        errorMessage = errorBody.error.message;
+      } else if (errorBody.error && typeof errorBody.error === 'string') {
         errorMessage = errorBody.error;
+      } else if (errorBody.message) {
+        errorMessage = errorBody.message;
+      } else if (typeof errorBody.error === 'string') {
+        errorMessage = errorBody.error;
+      } else if (errorBody.code) {
+        errorMessage = `${errorBody.code}: ${errorBody.message || 'Unknown error'}`;
       }
-    } catch {
+    } catch (parseError) {
       // Si no se puede parsear como JSON, usar el texto
       try {
         const errorText = await res.clone().text();
@@ -50,6 +57,7 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
         }
       } catch {
         // Mantener el mensaje por defecto
+        logger.warn('api-server', 'No se pudo extraer mensaje de error', { status: res.status });
       }
     }
     

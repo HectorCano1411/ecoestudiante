@@ -36,10 +36,26 @@ public class JwtUtil {
         return createToken(claims, username, expiration);
     }
 
+    public String generateToken(String username, String userId, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("type", "access");
+        claims.put("role", role != null ? role : "STUDENT"); // Default to STUDENT if no role
+        return createToken(claims, username, expiration);
+    }
+
     public String generateRefreshToken(String username, String userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("type", "refresh");
+        return createToken(claims, username, refreshExpiration);
+    }
+
+    public String generateRefreshToken(String username, String userId, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("type", "refresh");
+        claims.put("role", role != null ? role : "STUDENT");
         return createToken(claims, username, refreshExpiration);
     }
 
@@ -59,6 +75,10 @@ public class JwtUtil {
 
     public String extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", String.class));
+    }
+
+    public String extractRole(String token) {
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
     public Date extractExpiration(String token) {

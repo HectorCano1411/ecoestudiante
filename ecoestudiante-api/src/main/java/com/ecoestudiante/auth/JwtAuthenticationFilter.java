@@ -121,16 +121,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Usar userId como principal si username no está disponible
                 // Esto es crítico para tokens Auth0 que pueden no tener email/name
                 String principal = (username != null && !username.isBlank()) ? username : userId;
-                    
+
+                    // Extraer el rol del token JWT
+                    String role = null;
+                    try {
+                        role = jwtUtil.extractRole(token);
+                    } catch (Exception e) {
+                        logger.debug("No se pudo extraer rol del token, usando STUDENT por defecto");
+                    }
+
+                    // Si no hay rol, usar STUDENT por defecto
+                    String userRole = (role != null && !role.isBlank()) ? role : "STUDENT";
+
+                    // Agregar el rol como authority (Spring Security requiere prefijo ROLE_)
+                    String authority = "ROLE_" + userRole;
+
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                     principal,
                         null,
-                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        List.of(new SimpleGrantedAuthority(authority))
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    
-                logger.info("✅ Autenticación establecida en SecurityContext - Principal: {}, UserId: {}", principal, userId);
+
+                logger.info("✅ Autenticación establecida en SecurityContext - Principal: {}, UserId: {}, Role: {}", principal, userId, userRole);
             } else {
                 logger.warn("⚠️ Token presente pero no se pudo establecer autenticación - Token válido: {}, Username: {}, UserId: {}", 
                     tokenUtil.isTokenValid(token), username, userId);

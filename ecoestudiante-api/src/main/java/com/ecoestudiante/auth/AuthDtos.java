@@ -45,7 +45,8 @@ public class AuthDtos {
             String username,
             String userId,
             String email,
-            String refreshToken
+            String refreshToken,
+            String role  // Rol del usuario: STUDENT, ADMIN, MODERATOR
     ) {}
 
     public record ErrorResponse(

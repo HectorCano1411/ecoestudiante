@@ -44,6 +44,14 @@ spring:
           metadata:
             service-name: reports-service
 
+        # Servicio de Administración
+        - id: admin-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/admin/**
+          metadata:
+            service-name: admin-service
+
   # Redis para rate limiting (Fase 4)
   data:
     redis:

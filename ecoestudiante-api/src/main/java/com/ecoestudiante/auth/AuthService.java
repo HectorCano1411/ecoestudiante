@@ -217,11 +217,11 @@ public class AuthService {
             throw new IllegalArgumentException("La contraseña ingresada es incorrecta. Por favor intenta nuevamente.");
         }
 
-        logger.info("Login exitoso - Username: {}, UserId: {}", user.getUsername(), user.getId());
+        logger.info("Login exitoso - Username: {}, UserId: {}, Role: {}", user.getUsername(), user.getId(), user.getRole());
 
-        // Generar tokens JWT (access token y refresh token)
-        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString());
+        // Generar tokens JWT (access token y refresh token) con rol
+        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), user.getRole());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), user.getRole());
 
         return new AuthDtos.AuthResponse(
             accessToken,
@@ -229,7 +229,8 @@ public class AuthService {
             user.getUsername(),
             user.getId().toString(),
             user.getEmail(),
-            refreshToken
+            refreshToken,
+            user.getRole()  // Incluir rol en la respuesta
         );
     }
 
@@ -254,11 +255,11 @@ public class AuthService {
             throw new IllegalArgumentException("Usuario deshabilitado");
         }
 
-        // Generar nuevos tokens
-        String newAccessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString());
-        String newRefreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString());
+        // Generar nuevos tokens con rol
+        String newAccessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), user.getRole());
+        String newRefreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), user.getRole());
 
-        logger.info("Tokens renovados exitosamente - Username: {}", user.getUsername());
+        logger.info("Tokens renovados exitosamente - Username: {}, Role: {}", user.getUsername(), user.getRole());
 
         return new AuthDtos.AuthResponse(
             newAccessToken,
@@ -266,7 +267,8 @@ public class AuthService {
             user.getUsername(),
             user.getId().toString(),
             user.getEmail(),
-            newRefreshToken
+            newRefreshToken,
+            user.getRole()  // Incluir rol en la respuesta
         );
     }
 

@@ -48,7 +48,9 @@ env.local
 *.local
 
 # --- Scripts ---
+# Excluir scripts temporales, pero incluir start.sh
 *.sh
+!start.sh
 
 # --- Documentación local ---
 Git-Conventions.md

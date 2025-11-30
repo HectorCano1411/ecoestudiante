@@ -17,10 +17,14 @@ export default function Navbar() {
     setUsername(user);
   }, []);
 
+  // Verificar si es admin y agregar link al dashboard de admin
+  const isAdmin = typeof window !== 'undefined' && localStorage.getItem('isAdmin') === 'true';
+
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
+    localStorage.removeItem('isAdmin');
     setIsAuthenticated(false);
     setUsername(null);
     router.push('/');
@@ -60,6 +64,14 @@ export default function Navbar() {
                 >
                   Dashboard
                 </Link>
+                {isAdmin && (
+                  <Link 
+                    href="/admin/dashboard" 
+                    className="text-blue-600 hover:text-blue-700 transition-colors font-medium"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <div className="flex items-center space-x-4">
                   <span className="text-sm text-gray-600">Hola, {username}</span>
                   <button
@@ -83,6 +95,13 @@ export default function Navbar() {
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                 >
                   Registrarse
+                </Link>
+                <Link
+                  href="/admin/login"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+                  title="Acceso para administradores"
+                >
+                  🔐 Admin
                 </Link>
               </div>
             )}
@@ -169,6 +188,13 @@ export default function Navbar() {
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Registrarse
+                </Link>
+                <Link
+                  href="/admin/login"
+                  className="block px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-center mt-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  🔐 Acceso Admin
                 </Link>
               </>
             )}
