@@ -8,18 +8,23 @@ import DashboardMenu from '@/components/DashboardMenu';
 import ElectricityForm from '@/components/ElectricityForm';
 import TransportForm from '@/components/TransportForm';
 import WasteForm from '@/components/WasteForm';
+import { GamificationProfile, Leaderboard, MissionCard } from '@/components/gamification';
 import { api } from '@/lib/api-client';
 import type { StatsSummary } from '@/types/calc';
+import type { XPBalance, Mission, MissionProgress } from '@/types/gamification';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user: auth0User, isLoading: auth0Loading } = useUser();
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'menu' | 'electricity' | 'transport' | 'waste'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'electricity' | 'transport' | 'waste' | 'missions' | 'leaderboard'>('menu');
   const [stats, setStats] = useState<StatsSummary | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [authMethod, setAuthMethod] = useState<'jwt' | 'auth0' | null>(null);
+  const [xpBalance, setXpBalance] = useState<XPBalance | null>(null);
+  const [activeMissions, setActiveMissions] = useState<any[]>([]);
+  const [loadingMissions, setLoadingMissions] = useState(false);
 
   useEffect(() => {
     // ========================================================================
@@ -60,23 +65,54 @@ export default function DashboardPage() {
   const loadStats = useCallback(async () => {
     try {
       setLoadingStats(true);
-      // Si el usuario está autenticado con Auth0, usar el proxy que incluye el token de Auth0
-      // Si está autenticado con JWT, usar la API tradicional
-      if (authMethod === 'auth0') {
-        // Para Auth0, las llamadas deben ir a través del proxy o usar el endpoint que maneja Auth0
-        // Por ahora, intentamos con la API tradicional (puede que necesite ajustes en el backend)
-        const data = await api<StatsSummary>('/stats/summary');
-        setStats(data);
-      } else {
-        const data = await api<StatsSummary>('/stats/summary');
-        setStats(data);
-      }
+      const data = await api<StatsSummary>('/stats/summary');
+      setStats(data);
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
     } finally {
       setLoadingStats(false);
     }
   }, [authMethod]);
+
+  const loadGamificationData = useCallback(async () => {
+    try {
+      // Cargar XP balance
+      const xpData = await api<XPBalance>('/gam/xp-balance', { method: 'GET' });
+      setXpBalance(xpData);
+
+      // Cargar misiones activas
+      const missionsData = await api<any>('/gam/missions/my-progress', { method: 'GET' });
+      setActiveMissions(missionsData.activeMissions || []);
+    } catch (error) {
+      console.error('Error cargando datos de gamificación:', error);
+    }
+  }, []);
+
+  const handleAcceptMission = async (missionId: number) => {
+    try {
+      await api(`/gam/missions/${missionId}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ missionId })
+      });
+      loadGamificationData();
+      alert('¡Misión aceptada con éxito! 🚀');
+    } catch (error) {
+      console.error('Error al aceptar misión:', error);
+    }
+  };
+
+  const handleCompleteMission = async (missionId: number) => {
+    try {
+      await api(`/gam/missions/${missionId}/complete`, {
+        method: 'POST'
+      });
+      loadGamificationData();
+      loadStats(); // Recargar stats también
+      alert('¡Misión completada! 🎉 XP otorgado.');
+    } catch (error) {
+      console.error('Error al completar misión:', error);
+    }
+  };
 
   useEffect(() => {
     // Cargar estadísticas cuando se muestra el menú
@@ -85,6 +121,14 @@ export default function DashboardPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, loading, authMethod]);
+
+  useEffect(() => {
+    // Cargar datos de gamificación cuando el usuario esté autenticado
+    if (!loading && authMethod) {
+      loadGamificationData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, authMethod]);
 
   const handleLogout = () => {
     if (authMethod === 'auth0') {
@@ -125,20 +169,66 @@ export default function DashboardPage() {
               <h1 className="text-xl font-bold text-gray-800">EcoEstudiante</h1>
             </div>
             <div className="flex items-center gap-4">
+              {/* Widget de XP/Nivel */}
+              {xpBalance && (
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200 cursor-pointer hover:shadow-md transition-all"
+                  onClick={() => setActiveSection('missions')}
+                  title="Ver perfil de gamificación"
+                >
+                  <span className="text-xl">
+                    {xpBalance.currentLevel <= 2 ? '🌱' :
+                     xpBalance.currentLevel <= 5 ? '🛡️' :
+                     xpBalance.currentLevel <= 9 ? '⚡' :
+                     xpBalance.currentLevel <= 15 ? '🏆' : '👑'}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700 leading-tight">
+                      Nivel {xpBalance.currentLevel}
+                    </p>
+                    <p className="text-xs text-gray-600 leading-tight">
+                      {xpBalance.totalXp} XP
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setActiveSection('missions')}
+                className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              >
+                🎯 Misiones
+                {activeMissions.length > 0 && (
+                  <span className="bg-white text-green-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                    {activeMissions.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setActiveSection('leaderboard')}
+                className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                🏆 Ranking
+              </button>
+
               <Link href="/analytics" prefetch={false}>
                 <button className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
                   📊 Análisis
                 </button>
               </Link>
+
               <Link href="/history" prefetch={false}>
                 <button className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                  Ver Historial
+                  📜 Historial
                 </button>
               </Link>
-              <div className="text-right">
+
+              <div className="text-right border-l border-gray-200 pl-4">
                 <p className="text-sm font-medium text-gray-800">{username}</p>
                 <p className="text-xs text-gray-500">Sesión activa</p>
               </div>
+
               <button
                 onClick={handleLogout}
                 className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
@@ -154,7 +244,7 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="mb-6">
-          {(activeSection === 'electricity' || activeSection === 'transport' || activeSection === 'waste') && (
+          {activeSection !== 'menu' && (
             <button
               onClick={() => setActiveSection('menu')}
               className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
@@ -169,6 +259,10 @@ export default function DashboardPage() {
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
             {activeSection === 'menu'
               ? 'Mi Huella de Carbono'
+              : activeSection === 'missions'
+              ? '🎯 Misiones Verdes'
+              : activeSection === 'leaderboard'
+              ? '🏆 Ranking Semanal'
               : activeSection === 'electricity'
               ? 'Registrar Consumo Eléctrico'
               : activeSection === 'transport'
@@ -178,6 +272,10 @@ export default function DashboardPage() {
           <p className="text-gray-600">
             {activeSection === 'menu'
               ? 'Selecciona una categoría para registrar tu huella de carbono'
+              : activeSection === 'missions'
+              ? 'Completa misiones para ganar XP y reducir tu huella de carbono'
+              : activeSection === 'leaderboard'
+              ? 'Compite con otros estudiantes por reducir emisiones de CO₂'
               : activeSection === 'electricity'
               ? 'Ingresa los datos de tu consumo eléctrico mensual'
               : activeSection === 'transport'
@@ -273,7 +371,7 @@ export default function DashboardPage() {
 
             <TransportForm onSuccess={loadStats} />
           </div>
-        ) : (
+        ) : activeSection === 'waste' ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-2">
@@ -289,7 +387,56 @@ export default function DashboardPage() {
 
             <WasteForm onSuccess={loadStats} />
           </div>
-        )}
+        ) : activeSection === 'missions' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Columna izquierda - Perfil */}
+            <div className="lg:col-span-1">
+              <GamificationProfile showDetails={true} />
+            </div>
+
+            {/* Columna derecha - Misiones */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Misiones Activas */}
+              {activeMissions.length > 0 ? (
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">
+                    Misiones Activas ({activeMissions.length})
+                  </h3>
+                  <div className="space-y-4">
+                    {activeMissions.map((item: any) => (
+                      <MissionCard
+                        key={item.mission.id}
+                        mission={item.mission}
+                        progress={item.progress}
+                        onComplete={handleCompleteMission}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-12 text-center">
+                  <span className="text-6xl mb-4 block">🎯</span>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">
+                    No tienes misiones activas
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Completa cálculos de huella de carbono para desbloquear misiones
+                  </p>
+                  <button
+                    onClick={() => setActiveSection('menu')}
+                    className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    Ir a Calcular
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeSection === 'leaderboard' ? (
+          <div>
+            <Leaderboard topN={20} showWeekSelector={true} />
+          </div>
+        ) : null}
 
         {/* Stats Card */}
         {activeSection === 'menu' && (
