@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -55,7 +56,7 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public List<MissionDtos.MissionProgressResponse> getActiveMissionsForUser(Long userId) {
+    public List<MissionDtos.MissionProgressResponse> getActiveMissionsForUser(UUID userId) {
         logger.debug("Obteniendo misiones activas para usuario: {}", userId);
 
         List<MissionProgress> activeProgress = progressRepository.findActiveByUserId(userId);
@@ -70,7 +71,7 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public MissionDtos.UserMissionsProgressResponse getAllUserMissions(Long userId) {
+    public MissionDtos.UserMissionsProgressResponse getAllUserMissions(UUID userId) {
         logger.debug("Obteniendo todas las misiones para usuario: {}", userId);
 
         List<MissionProgress> allProgress = progressRepository.findAllByUserId(userId);
@@ -100,7 +101,7 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public MissionDtos.MissionProgressResponse getMissionProgress(Long userId, Long missionId) {
+    public MissionDtos.MissionProgressResponse getMissionProgress(UUID userId, Long missionId) {
         logger.debug("Obteniendo progreso de misión {} para usuario {}", missionId, userId);
 
         MissionProgress progress = progressRepository.findByUserAndMission(userId, missionId)
@@ -114,7 +115,7 @@ public class MissionServiceImpl implements MissionService {
     @Override
     @Transactional
     public MissionDtos.MissionProgressResponse assignMissionToUser(
-            Long userId,
+            UUID userId,
             MissionDtos.CreateMissionProgressRequest request) {
 
         logger.info("Asignando misión {} a usuario {}", request.missionId(), userId);
@@ -143,7 +144,7 @@ public class MissionServiceImpl implements MissionService {
     @Override
     @Transactional
     public MissionDtos.MissionProgressResponse updateMissionProgress(
-            Long userId,
+            UUID userId,
             Long missionId,
             MissionDtos.UpdateProgressRequest request) {
 
@@ -170,7 +171,7 @@ public class MissionServiceImpl implements MissionService {
 
     @Override
     @Transactional
-    public MissionDtos.MissionProgressResponse completeMission(Long userId, Long missionId) {
+    public MissionDtos.MissionProgressResponse completeMission(UUID userId, Long missionId) {
         logger.info("Completando misión {} para usuario {}", missionId, userId);
 
         MissionProgress progress = progressRepository.findByUserAndMission(userId, missionId)
@@ -192,7 +193,7 @@ public class MissionServiceImpl implements MissionService {
 
     @Override
     @Transactional
-    public List<MissionDtos.MissionProgressResponse> checkAndCompleteMissions(Long userId) {
+    public List<MissionDtos.MissionProgressResponse> checkAndCompleteMissions(UUID userId) {
         logger.debug("Verificando misiones activas para usuario {}", userId);
 
         List<MissionProgress> activeProgress = progressRepository.findActiveByUserId(userId);
@@ -275,7 +276,7 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public BigDecimal calculateBaseline(Long userId, Mission.MissionCategory category) {
+    public BigDecimal calculateBaseline(UUID userId, Mission.MissionCategory category) {
         // TODO: Integrar con el servicio de estadísticas para calcular el promedio real
         // Por ahora retorna un valor por defecto
         logger.debug("Calculando baseline para usuario {} y categoría {}", userId, category);

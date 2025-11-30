@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [authMethod, setAuthMethod] = useState<'jwt' | 'auth0' | null>(null);
   const [xpBalance, setXpBalance] = useState<XPBalance | null>(null);
-  const [activeMissions, setActiveMissions] = useState<any[]>([]);
+  const [activeMissions, setActiveMissions] = useState<Array<{ mission: Mission; progress: MissionProgress }>>([]);
   const [loadingMissions, setLoadingMissions] = useState(false);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function DashboardPage() {
       setXpBalance(xpData);
 
       // Cargar misiones activas
-      const missionsData = await api<any>('/gam/missions/my-progress', { method: 'GET' });
+      const missionsData = await api<{ activeMissions?: Array<{ mission: Mission; progress: MissionProgress }> }>('/gam/missions/my-progress', { method: 'GET' });
       setActiveMissions(missionsData.activeMissions || []);
     } catch (error) {
       console.error('Error cargando datos de gamificación:', error);
@@ -403,7 +403,7 @@ export default function DashboardPage() {
                     Misiones Activas ({activeMissions.length})
                   </h3>
                   <div className="space-y-4">
-                    {activeMissions.map((item: any) => (
+                    {activeMissions.map((item) => (
                       <MissionCard
                         key={item.mission.id}
                         mission={item.mission}

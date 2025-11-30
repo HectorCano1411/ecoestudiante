@@ -101,20 +101,20 @@ public class GamificationScheduledTasks {
    * Genera misiones cada 5 minutos durante desarrollo.
    * COMENTAR/ELIMINAR ESTE MÉTODO EN PRODUCCIÓN.
    */
-  // @Scheduled(cron = "0 */5 * * * *") // Cada 5 minutos
-  // public void generateWeeklyMissionsDevMode() {
-  //   try {
-  //     LocalDate now = LocalDate.now();
-  //     WeekFields weekFields = WeekFields.ISO;
-  //     int weekNumber = now.get(weekFields.weekOfWeekBasedYear());
-  //     int year = now.get(weekFields.weekBasedYear());
-  //     String weekString = String.format("%04d-W%02d", year, weekNumber);
-  //
-  //     logger.info("[DEV MODE] Generando misiones de prueba para semana {}...", weekString);
-  //     int generatedCount = missionService.generateWeeklyMissions(weekString, year);
-  //     logger.info("[DEV MODE] Misiones generadas: {}", generatedCount);
-  //   } catch (Exception e) {
-  //     logger.error("[DEV MODE] Error generando misiones: ", e);
-  //   }
-  // }
+  @Scheduled(cron = "0 */5 * * * *") // Cada 5 minutos
+  public void generateWeeklyMissionsDevMode() {
+    try {
+      LocalDate now = LocalDate.now();
+      WeekFields weekFields = WeekFields.ISO;
+      int weekNumber = now.get(weekFields.weekOfWeekBasedYear());
+      int year = now.get(weekFields.weekBasedYear());
+      String weekString = String.format("%04d-W%02d", year, weekNumber);
+
+      logger.info("[DEV MODE] Generando misiones de prueba para semana {}...", weekString);
+      int generatedCount = missionService.generateWeeklyMissions(weekString, year);
+      logger.info("[DEV MODE] Misiones generadas: {}", generatedCount);
+    } catch (Exception e) {
+      logger.error("[DEV MODE] Error generando misiones: ", e);
+    }
+  }
 }

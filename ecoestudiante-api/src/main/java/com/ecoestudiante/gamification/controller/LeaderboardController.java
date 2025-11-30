@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
+import java.util.UUID;
 
 /**
  * Controlador REST para Leaderboard (Ranking).
@@ -44,21 +45,12 @@ public class LeaderboardController {
 
     private final LeaderboardService leaderboardService;
     private final UserContextResolver userContextResolver;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public LeaderboardController(
             LeaderboardService leaderboardService,
-            UserContextResolver userContextResolver,
-            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+            UserContextResolver userContextResolver) {
         this.leaderboardService = leaderboardService;
         this.userContextResolver = userContextResolver;
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    private Long getUserIdAsLong(HttpServletRequest request) {
-        java.util.UUID uuid = userContextResolver.resolve(request).normalizedUserId();
-        String sql = "SELECT CAST(id AS BIGINT) FROM users WHERE id = CAST(? AS UUID)";
-        return jdbcTemplate.queryForObject(sql, Long.class, uuid.toString());
     }
 
     /**
@@ -82,7 +74,7 @@ public class LeaderboardController {
             HttpServletRequest request) {
 
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
             logger.info("Obteniendo leaderboard actual (top {}) para usuario {}", topN, userId);
 
             // Obtener leaderboard
@@ -137,7 +129,7 @@ public class LeaderboardController {
             HttpServletRequest request) {
 
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
 
             // Parsear año si no se proporciona
             if (year == null) {
@@ -194,7 +186,7 @@ public class LeaderboardController {
     })
     public ResponseEntity<MissionDtos.LeaderboardEntryResponse> getMyPosition(HttpServletRequest request) {
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
             logger.info("Obteniendo posición de usuario {} en leaderboard", userId);
 
             MissionDtos.LeaderboardEntryResponse position = leaderboardService.getUserPosition(userId);

@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Implementación del servicio de Gamificación.
@@ -58,15 +59,15 @@ public class GamificationServiceImpl implements GamificationService {
         logger.debug("getXPBalance llamado para usuario: {}", userId);
 
         try {
-            Long userIdLong = Long.parseLong(userId);
+            UUID userIdUuid = UUID.fromString(userId);
 
-            GamificationProfile profile = profileRepository.findByUserId(userIdLong)
-                    .orElseGet(() -> createDefaultProfile(userIdLong));
+            GamificationProfile profile = profileRepository.findByUserId(userIdUuid)
+                    .orElseGet(() -> createDefaultProfile(userIdUuid));
 
             // Calcular XP del mes actual
             LocalDateTime monthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
             LocalDateTime monthEnd = LocalDateTime.now().plusMonths(1).withDayOfMonth(1).withHour(0).minusSeconds(1);
-            Integer xpThisMonth = xpTransactionRepository.sumXpByUserBetweenDates(userIdLong, monthStart, monthEnd);
+            Integer xpThisMonth = xpTransactionRepository.sumXpByUserBetweenDates(userIdUuid, monthStart, monthEnd);
 
             // Calcular XP necesario para siguiente nivel
             long nextLevelXp = (long) Math.pow(profile.getCurrentLevel() + 1, 2) * 100;
@@ -90,10 +91,10 @@ public class GamificationServiceImpl implements GamificationService {
         logger.debug("getStreaks llamado para usuario: {}", userId);
 
         try {
-            Long userIdLong = Long.parseLong(userId);
+            UUID userIdUuid = UUID.fromString(userId);
 
-            GamificationProfile profile = profileRepository.findByUserId(userIdLong)
-                    .orElseGet(() -> createDefaultProfile(userIdLong));
+            GamificationProfile profile = profileRepository.findByUserId(userIdUuid)
+                    .orElseGet(() -> createDefaultProfile(userIdUuid));
 
             return new GamificationDtos.StreakInfo(
                     profile.getCurrentStreak(),
@@ -128,28 +129,28 @@ public class GamificationServiceImpl implements GamificationService {
         logger.info("Otorgando {} XP a usuario {} por razón: {}", xpAmount, userId, reason);
 
         try {
-            Long userIdLong = Long.parseLong(userId);
+            UUID userIdUuid = UUID.fromString(userId);
 
             // Asegurar que existe el perfil
-            GamificationProfile profile = profileRepository.findByUserId(userIdLong)
-                    .orElseGet(() -> createAndSaveProfile(userIdLong));
+            GamificationProfile profile = profileRepository.findByUserId(userIdUuid)
+                    .orElseGet(() -> createAndSaveProfile(userIdUuid));
 
             // Actualizar XP total
-            profileRepository.addXp(userIdLong, xpAmount);
+            profileRepository.addXp(userIdUuid, xpAmount);
 
             // Registrar transacción
             XpTransaction transaction = new XpTransaction();
-            transaction.setUserId(userIdLong);
+            transaction.setUserId(userIdUuid);
             transaction.setAmount(xpAmount);
             transaction.setSource(mapReasonToSource(reason));
             transaction.setDescription(reason);
             xpTransactionRepository.save(transaction);
 
             // Actualizar última actividad
-            profileRepository.updateLastActivity(userIdLong, LocalDate.now());
+            profileRepository.updateLastActivity(userIdUuid, LocalDate.now());
 
             // Verificar y actualizar streak
-            updateStreakIfNeeded(userIdLong, profile);
+            updateStreakIfNeeded(userIdUuid, profile);
 
             logger.info("XP otorgado exitosamente a usuario {}", userId);
         } catch (Exception e) {
@@ -162,7 +163,7 @@ public class GamificationServiceImpl implements GamificationService {
     // Métodos auxiliares
     // =========================================================================
 
-    private GamificationProfile createDefaultProfile(Long userId) {
+    private GamificationProfile createDefaultProfile(UUID userId) {
         logger.debug("Creando perfil por defecto para usuario {}", userId);
 
         GamificationProfile profile = new GamificationProfile();
@@ -176,7 +177,7 @@ public class GamificationServiceImpl implements GamificationService {
         return profile;
     }
 
-    private GamificationProfile createAndSaveProfile(Long userId) {
+    private GamificationProfile createAndSaveProfile(UUID userId) {
         logger.info("Creando y guardando perfil de gamificación para usuario {}", userId);
 
         GamificationProfile profile = createDefaultProfile(userId);
@@ -195,7 +196,7 @@ public class GamificationServiceImpl implements GamificationService {
         };
     }
 
-    private void updateStreakIfNeeded(Long userId, GamificationProfile profile) {
+    private void updateStreakIfNeeded(UUID userId, GamificationProfile profile) {
         LocalDate today = LocalDate.now();
         LocalDate lastActivity = profile.getLastActivityDate();
 

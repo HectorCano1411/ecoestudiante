@@ -3,6 +3,7 @@ package com.ecoestudiante.gamification.model;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Modelo de dominio para el Cache del Leaderboard (Ranking).
@@ -27,9 +28,9 @@ public class LeaderboardCache {
     private Long id;
 
     /**
-     * ID del usuario (FK a users.id)
+     * ID del usuario (FK a app_user.id)
      */
-    private Long userId;
+    private UUID userId;
 
     /**
      * Número de semana ISO (formato: 2025-W01)

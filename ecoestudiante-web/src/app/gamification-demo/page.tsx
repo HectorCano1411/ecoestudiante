@@ -19,20 +19,32 @@ import { GamificationProfile, Leaderboard, MissionCard } from '@/components/gami
 import { api } from '@/lib/api-client';
 import type { Mission, MissionProgress } from '@/types/gamification';
 
+interface MissionsResponse {
+  missions?: Mission[];
+}
+
+interface MyProgressResponse {
+  activeMissions?: Array<{ mission: Mission; progress: MissionProgress }>;
+  availableMissions?: Mission[];
+  completedMissions?: Array<{ mission: Mission; progress: MissionProgress }>;
+  totalActive?: number;
+  totalCompleted?: number;
+}
+
 export default function GamificationDemoPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [myProgress, setMyProgress] = useState<any>(null);
+  const [myProgress, setMyProgress] = useState<MyProgressResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Obtener misiones disponibles
-        const missionsData = await api<any>('/gam/missions', { method: 'GET' });
+        const missionsData = await api<MissionsResponse>('/gam/missions', { method: 'GET' });
         setMissions(missionsData.missions || []);
 
         // Obtener mi progreso
-        const progressData = await api<any>('/gam/missions/my-progress', { method: 'GET' });
+        const progressData = await api<MyProgressResponse>('/gam/missions/my-progress', { method: 'GET' });
         setMyProgress(progressData);
       } catch (error) {
         console.error('Error al cargar datos de gamificación:', error);
@@ -52,7 +64,7 @@ export default function GamificationDemoPage() {
       });
 
       // Recargar datos
-      const progressData = await api<any>('/gam/missions/my-progress', { method: 'GET' });
+      const progressData = await api<MyProgressResponse>('/gam/missions/my-progress', { method: 'GET' });
       setMyProgress(progressData);
 
       alert('¡Misión aceptada con éxito! 🚀');
@@ -69,7 +81,7 @@ export default function GamificationDemoPage() {
       });
 
       // Recargar datos
-      const progressData = await api<any>('/gam/missions/my-progress', { method: 'GET' });
+      const progressData = await api<MyProgressResponse>('/gam/missions/my-progress', { method: 'GET' });
       setMyProgress(progressData);
 
       alert('¡Misión completada! 🎉 XP otorgado.');
@@ -132,7 +144,7 @@ export default function GamificationDemoPage() {
                   🎯 Misiones Activas ({myProgress.totalActive})
                 </h2>
                 <div className="space-y-4">
-                  {myProgress.activeMissions.slice(0, 3).map((item: any) => (
+                  {myProgress.activeMissions.slice(0, 3).map((item) => (
                     <MissionCard
                       key={item.mission.id}
                       mission={item.mission}
@@ -170,7 +182,7 @@ export default function GamificationDemoPage() {
                   ✅ Completadas ({myProgress.totalCompleted})
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {myProgress.completedMissions.slice(0, 4).map((item: any) => (
+                  {myProgress.completedMissions.slice(0, 4).map((item) => (
                     <MissionCard
                       key={item.mission.id}
                       mission={item.mission}

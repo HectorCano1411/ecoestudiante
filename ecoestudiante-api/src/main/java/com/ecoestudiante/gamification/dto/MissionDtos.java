@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * DTOs para el módulo de Misiones Verdes y Gamificación.
@@ -200,8 +201,8 @@ public final class MissionDtos {
             @Schema(description = "Posición en el ranking", example = "1")
             Integer rank,
 
-            @Schema(description = "ID del usuario", example = "1")
-            Long userId,
+            @Schema(description = "ID del usuario", example = "550e8400-e29b-41d4-a716-446655440000")
+            UUID userId,
 
             @Schema(description = "Nombre de usuario (anonimizado)", example = "eco_hero_***")
             String username,

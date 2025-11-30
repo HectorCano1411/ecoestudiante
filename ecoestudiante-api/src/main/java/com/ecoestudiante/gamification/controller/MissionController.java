@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Controlador REST para Misiones Verdes.
@@ -47,15 +48,12 @@ public class MissionController {
 
     private final MissionService missionService;
     private final UserContextResolver userContextResolver;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public MissionController(
             MissionService missionService,
-            UserContextResolver userContextResolver,
-            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+            UserContextResolver userContextResolver) {
         this.missionService = missionService;
         this.userContextResolver = userContextResolver;
-        this.jdbcTemplate = jdbcTemplate;
     }
 
     /**
@@ -110,7 +108,7 @@ public class MissionController {
     })
     public ResponseEntity<MissionDtos.UserMissionsProgressResponse> getMyProgress(HttpServletRequest request) {
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
             logger.info("Obteniendo progreso de misiones para usuario: {}", userId);
 
             MissionDtos.UserMissionsProgressResponse progress = missionService.getAllUserMissions(userId);
@@ -137,7 +135,7 @@ public class MissionController {
     })
     public ResponseEntity<List<MissionDtos.MissionProgressResponse>> getActiveMissions(HttpServletRequest request) {
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
             logger.info("Obteniendo misiones activas para usuario: {}", userId);
 
             List<MissionDtos.MissionProgressResponse> activeMissions = missionService.getActiveMissionsForUser(userId);
@@ -170,7 +168,7 @@ public class MissionController {
             HttpServletRequest httpRequest) {
 
         try {
-            Long userId = getUserIdAsLong(httpRequest);
+            UUID userId = userContextResolver.resolve(httpRequest).normalizedUserId();
             logger.info("Asignando misión {} a usuario {}", missionId, userId);
 
             // Si no se proporciona request, crear uno vacío
@@ -208,7 +206,7 @@ public class MissionController {
             HttpServletRequest httpRequest) {
 
         try {
-            Long userId = getUserIdAsLong(httpRequest);
+            UUID userId = userContextResolver.resolve(httpRequest).normalizedUserId();
             logger.info("Actualizando progreso de misión {} para usuario {}", missionId, userId);
 
             MissionDtos.MissionProgressResponse progress = missionService.updateMissionProgress(
@@ -242,7 +240,7 @@ public class MissionController {
             HttpServletRequest request) {
 
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
             logger.info("Completando misión {} para usuario {}", missionId, userId);
 
             MissionDtos.MissionProgressResponse progress = missionService.completeMission(userId, missionId);
@@ -269,7 +267,7 @@ public class MissionController {
     })
     public ResponseEntity<List<MissionDtos.MissionProgressResponse>> checkMissions(HttpServletRequest request) {
         try {
-            Long userId = getUserIdAsLong(request);
+            UUID userId = userContextResolver.resolve(request).normalizedUserId();
             logger.info("Verificando misiones para usuario {}", userId);
 
             List<MissionDtos.MissionProgressResponse> completedMissions = missionService.checkAndCompleteMissions(userId);
@@ -280,6 +278,45 @@ public class MissionController {
             throw new RuntimeException("Error al verificar misiones", e);
         }
     }
+
+    /**
+     * [ADMIN/DEV] Genera misiones para la semana especificada manualmente
+     */
+    @PostMapping(path = "/admin/generate", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "[ADMIN] Generar misiones semanales manualmente",
+            description = "Endpoint de administración para generar misiones de una semana específica")
+    public ResponseEntity<?> generateMissions(
+            @RequestParam(required = false) String weekNumber,
+            @RequestParam(required = false) Integer year) {
+        try {
+            String[] currentWeek = getCurrentWeekAndYear();
+            String targetWeek = weekNumber != null ? weekNumber : currentWeek[0];
+            Integer targetYear = year != null ? year : Integer.parseInt(currentWeek[1]);
+
+            logger.info("[ADMIN] Generando misiones para semana {}-{}", targetWeek, targetYear);
+
+            int count = missionService.generateWeeklyMissions(targetWeek, targetYear);
+
+            return ResponseEntity.ok(new GenerateResponse(
+                    count,
+                    targetWeek,
+                    targetYear,
+                    "Misiones generadas exitosamente"
+            ));
+        } catch (Exception e) {
+            logger.error("[ADMIN] Error al generar misiones", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new GenerateResponse(0, null, null, "Error: " + e.getMessage()));
+        }
+    }
+
+    // DTO de respuesta para generación de misiones
+    private record GenerateResponse(
+            int missionsGenerated,
+            String weekNumber,
+            Integer year,
+            String message
+    ) {}
 
     // =========================================================================
     // Métodos auxiliares
@@ -293,10 +330,4 @@ public class MissionController {
         return new String[]{weekNumber, String.valueOf(year)};
     }
 
-    private Long getUserIdAsLong(HttpServletRequest request) {
-        java.util.UUID uuid = userContextResolver.resolve(request).normalizedUserId();
-        // Convertir UUID a Long mediante consulta a BD
-        String sql = "SELECT CAST(id AS BIGINT) FROM users WHERE id = CAST(? AS UUID)";
-        return jdbcTemplate.queryForObject(sql, Long.class, uuid.toString());
-    }
 }

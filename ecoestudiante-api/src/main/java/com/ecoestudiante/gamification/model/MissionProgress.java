@@ -3,6 +3,7 @@ package com.ecoestudiante.gamification.model;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Modelo de dominio para el Progreso de Misiones.
@@ -25,9 +26,9 @@ public class MissionProgress {
     private Long id;
 
     /**
-     * ID del usuario (FK a users.id)
+     * ID del usuario (FK a app_user.id)
      */
-    private Long userId;
+    private UUID userId;
 
     /**
      * ID de la misión (FK a missions.id)

@@ -109,7 +109,7 @@ public class GamificationController {
      * @return Balance de XP con nivel actual y progreso
      */
     @GetMapping(
-            path = "/xp",
+            path = {"/xp", "/xp-balance"},
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     @Operation(

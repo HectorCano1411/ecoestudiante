@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -82,13 +83,13 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     }
 
     @Override
-    public MissionDtos.LeaderboardEntryResponse getUserPosition(Long userId) {
+    public MissionDtos.LeaderboardEntryResponse getUserPosition(UUID userId) {
         String[] currentWeek = getCurrentWeekAndYear();
         return getUserPositionInWeek(userId, currentWeek[0], Integer.parseInt(currentWeek[1]));
     }
 
     @Override
-    public MissionDtos.LeaderboardEntryResponse getUserPositionInWeek(Long userId, String weekNumber, Integer year) {
+    public MissionDtos.LeaderboardEntryResponse getUserPositionInWeek(UUID userId, String weekNumber, Integer year) {
         logger.debug("Obteniendo posición de usuario {} en semana {}-{}", userId, weekNumber, year);
 
         return leaderboardRepository.findByUserAndWeek(userId, weekNumber, year)
@@ -117,8 +118,8 @@ public class LeaderboardServiceImpl implements LeaderboardService {
                 ) AS active_users
                 """;
 
-        List<Long> activeUserIds = jdbcTemplate.queryForList(
-                sql, Long.class,
+        List<UUID> activeUserIds = jdbcTemplate.queryForList(
+                sql, UUID.class,
                 weekNumber, year,
                 weekNumber, year
         );
@@ -127,7 +128,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
                 activeUserIds.size(), weekNumber, year);
 
         // Calcular y guardar entrada para cada usuario
-        for (Long userId : activeUserIds) {
+        for (UUID userId : activeUserIds) {
             try {
                 updateUserLeaderboardEntry(userId, weekNumber, year);
             } catch (Exception e) {
@@ -144,7 +145,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
 
     @Override
     @Transactional
-    public void updateUserLeaderboardEntry(Long userId, String weekNumber, Integer year) {
+    public void updateUserLeaderboardEntry(UUID userId, String weekNumber, Integer year) {
         logger.debug("Actualizando entrada de leaderboard para usuario {} en semana {}-{}",
                 userId, weekNumber, year);
 
@@ -166,7 +167,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     }
 
     @Override
-    public BigDecimal calculateCo2AvoidedForWeek(Long userId, String weekNumber, Integer year) {
+    public BigDecimal calculateCo2AvoidedForWeek(UUID userId, String weekNumber, Integer year) {
         // TODO: Integrar con StatsService para obtener datos reales de emisiones
         // Por ahora retorna un valor simulado basado en misiones completadas
 
@@ -188,7 +189,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         return new String[]{weekNumber, String.valueOf(year)};
     }
 
-    private int countMissionsCompletedInWeek(Long userId, String weekNumber, Integer year) {
+    private int countMissionsCompletedInWeek(UUID userId, String weekNumber, Integer year) {
         // Obtener rango de fechas de la semana
         LocalDateTime[] weekRange = getWeekDateRange(weekNumber, year);
 
@@ -197,7 +198,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         );
     }
 
-    private int sumXpGainedInWeek(Long userId, String weekNumber, Integer year) {
+    private int sumXpGainedInWeek(UUID userId, String weekNumber, Integer year) {
         LocalDateTime[] weekRange = getWeekDateRange(weekNumber, year);
 
         return xpRepository.sumXpByUserBetweenDates(
@@ -246,7 +247,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         );
     }
 
-    private String getUsername(Long userId) {
+    private String getUsername(UUID userId) {
         // Consultar username desde tabla users
         try {
             return jdbcTemplate.queryForObject(

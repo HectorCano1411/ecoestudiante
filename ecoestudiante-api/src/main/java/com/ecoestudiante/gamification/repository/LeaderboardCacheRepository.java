@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repositorio para el acceso a datos del Cache del Leaderboard.
@@ -84,7 +85,7 @@ public class LeaderboardCacheRepository {
     /**
      * Obtiene la posición de un usuario en una semana específica
      */
-    public Optional<LeaderboardCache> findByUserAndWeek(Long userId, String weekNumber, Integer year) {
+    public Optional<LeaderboardCache> findByUserAndWeek(UUID userId, String weekNumber, Integer year) {
         String sql = """
                 SELECT id, user_id, week_number, year, co2_avoided_kg,
                        missions_completed, total_xp_week, rank_position, calculated_at
@@ -103,7 +104,7 @@ public class LeaderboardCacheRepository {
     /**
      * Obtiene todas las entradas de ranking de un usuario
      */
-    public List<LeaderboardCache> findByUserId(Long userId) {
+    public List<LeaderboardCache> findByUserId(UUID userId) {
         String sql = """
                 SELECT id, user_id, week_number, year, co2_avoided_kg,
                        missions_completed, total_xp_week, rank_position, calculated_at
@@ -147,8 +148,8 @@ public class LeaderboardCacheRepository {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, cache.getUserId());
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+            ps.setObject(1, cache.getUserId());
             ps.setString(2, cache.getWeekNumber());
             ps.setInt(3, cache.getYear());
             ps.setBigDecimal(4, cache.getCo2AvoidedKg());
@@ -253,7 +254,7 @@ public class LeaderboardCacheRepository {
             LeaderboardCache cache = new LeaderboardCache();
 
             cache.setId(rs.getLong("id"));
-            cache.setUserId(rs.getLong("user_id"));
+            cache.setUserId((UUID) rs.getObject("user_id"));
             cache.setWeekNumber(rs.getString("week_number"));
             cache.setYear(rs.getInt("year"));
             cache.setCo2AvoidedKg(rs.getBigDecimal("co2_avoided_kg"));

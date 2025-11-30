@@ -12,7 +12,7 @@ import { getAuthToken } from '@/lib/auth-token';
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { missionId: string } }
+  context: { params: Promise<{ missionId: string }> }
 ) {
   try {
     const { token, type, userId } = await getAuthToken(req);
@@ -28,7 +28,7 @@ export async function POST(
       );
     }
 
-    const { missionId } = params;
+    const { missionId } = await context.params;
 
     logger.info('route:mission-assign', 'income', {
       authType: type,

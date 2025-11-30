@@ -13,6 +13,8 @@ import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.sql.Timestamp;
 
 /**
  * Repositorio para el acceso a datos de Transacciones de XP.
@@ -54,7 +56,7 @@ public class XpTransactionRepository {
     /**
      * Obtiene todas las transacciones de un usuario
      */
-    public List<XpTransaction> findByUserId(Long userId) {
+    public List<XpTransaction> findByUserId(UUID userId) {
         String sql = """
                 SELECT id, user_id, amount, source, reference_id, reference_type,
                        description, created_at
@@ -69,7 +71,7 @@ public class XpTransactionRepository {
     /**
      * Obtiene transacciones de un usuario con paginación
      */
-    public List<XpTransaction> findByUserIdPaginated(Long userId, int limit, int offset) {
+    public List<XpTransaction> findByUserIdPaginated(UUID userId, int limit, int offset) {
         String sql = """
                 SELECT id, user_id, amount, source, reference_id, reference_type,
                        description, created_at
@@ -85,7 +87,7 @@ public class XpTransactionRepository {
     /**
      * Obtiene transacciones de un usuario por fuente
      */
-    public List<XpTransaction> findByUserIdAndSource(Long userId, XpSource source) {
+    public List<XpTransaction> findByUserIdAndSource(UUID userId, XpSource source) {
         String sql = """
                 SELECT id, user_id, amount, source, reference_id, reference_type,
                        description, created_at
@@ -100,7 +102,7 @@ public class XpTransactionRepository {
     /**
      * Obtiene transacciones de un usuario en un rango de fechas
      */
-    public List<XpTransaction> findByUserIdBetweenDates(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
+    public List<XpTransaction> findByUserIdBetweenDates(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
         String sql = """
                 SELECT id, user_id, amount, source, reference_id, reference_type,
                        description, created_at
@@ -118,7 +120,7 @@ public class XpTransactionRepository {
     /**
      * Calcula el total de XP ganado por un usuario en un rango de fechas
      */
-    public Integer sumXpByUserBetweenDates(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
+    public Integer sumXpByUserBetweenDates(UUID userId, LocalDateTime startDate, LocalDateTime endDate) {
         String sql = """
                 SELECT COALESCE(SUM(amount), 0) FROM xp_transactions
                 WHERE user_id = ?
@@ -134,7 +136,7 @@ public class XpTransactionRepository {
     /**
      * Calcula el total de XP ganado por un usuario por fuente
      */
-    public Integer sumXpByUserAndSource(Long userId, XpSource source) {
+    public Integer sumXpByUserAndSource(UUID userId, XpSource source) {
         String sql = """
                 SELECT COALESCE(SUM(amount), 0) FROM xp_transactions
                 WHERE user_id = ? AND source = ?::xp_source
@@ -157,8 +159,8 @@ public class XpTransactionRepository {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, transaction.getUserId());
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+            ps.setObject(1, transaction.getUserId());
             ps.setInt(2, transaction.getAmount());
             ps.setString(3, transaction.getSource().name());
 
@@ -192,7 +194,7 @@ public class XpTransactionRepository {
     /**
      * Obtiene el historial reciente de transacciones (últimas N)
      */
-    public List<XpTransaction> findRecentTransactions(Long userId, int limit) {
+    public List<XpTransaction> findRecentTransactions(UUID userId, int limit) {
         String sql = """
                 SELECT id, user_id, amount, source, reference_id, reference_type,
                        description, created_at
@@ -208,7 +210,7 @@ public class XpTransactionRepository {
     /**
      * Cuenta el total de transacciones de un usuario
      */
-    public int countByUserId(Long userId) {
+    public int countByUserId(UUID userId) {
         String sql = "SELECT COUNT(*) FROM xp_transactions WHERE user_id = ?";
         Integer count = jdbc.queryForObject(sql, Integer.class, userId);
         return count != null ? count : 0;
@@ -245,7 +247,7 @@ public class XpTransactionRepository {
             XpTransaction transaction = new XpTransaction();
 
             transaction.setId(rs.getLong("id"));
-            transaction.setUserId(rs.getLong("user_id"));
+            transaction.setUserId((UUID) rs.getObject("user_id"));
             transaction.setAmount(rs.getInt("amount"));
             transaction.setSource(XpSource.valueOf(rs.getString("source")));
 

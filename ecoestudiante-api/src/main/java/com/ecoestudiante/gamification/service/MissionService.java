@@ -4,6 +4,7 @@ import com.ecoestudiante.gamification.dto.MissionDtos;
 import com.ecoestudiante.gamification.model.Mission;
 import com.ecoestudiante.gamification.model.MissionProgress;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Interfaz del servicio de Misiones Verdes.
@@ -35,7 +36,7 @@ public interface MissionService {
      * @param userId ID del usuario
      * @return Lista del progreso de misiones activas
      */
-    List<MissionDtos.MissionProgressResponse> getActiveMissionsForUser(Long userId);
+    List<MissionDtos.MissionProgressResponse> getActiveMissionsForUser(UUID userId);
 
     /**
      * Obtiene todas las misiones de un usuario (activas, completadas, expiradas)
@@ -43,7 +44,7 @@ public interface MissionService {
      * @param userId ID del usuario
      * @return Progreso de todas las misiones del usuario
      */
-    MissionDtos.UserMissionsProgressResponse getAllUserMissions(Long userId);
+    MissionDtos.UserMissionsProgressResponse getAllUserMissions(UUID userId);
 
     /**
      * Obtiene el progreso de un usuario en una misión específica
@@ -52,7 +53,7 @@ public interface MissionService {
      * @param missionId ID de la misión
      * @return Progreso de la misión
      */
-    MissionDtos.MissionProgressResponse getMissionProgress(Long userId, Long missionId);
+    MissionDtos.MissionProgressResponse getMissionProgress(UUID userId, Long missionId);
 
     /**
      * Asigna una misión a un usuario (crea el progreso inicial)
@@ -61,7 +62,7 @@ public interface MissionService {
      * @param request Datos de la misión a asignar
      * @return Progreso de misión creado
      */
-    MissionDtos.MissionProgressResponse assignMissionToUser(Long userId, MissionDtos.CreateMissionProgressRequest request);
+    MissionDtos.MissionProgressResponse assignMissionToUser(UUID userId, MissionDtos.CreateMissionProgressRequest request);
 
     /**
      * Actualiza el progreso de una misión
@@ -71,7 +72,7 @@ public interface MissionService {
      * @param request Nuevo progreso
      * @return Progreso actualizado
      */
-    MissionDtos.MissionProgressResponse updateMissionProgress(Long userId, Long missionId, MissionDtos.UpdateProgressRequest request);
+    MissionDtos.MissionProgressResponse updateMissionProgress(UUID userId, Long missionId, MissionDtos.UpdateProgressRequest request);
 
     /**
      * Marca una misión como completada manualmente
@@ -81,7 +82,7 @@ public interface MissionService {
      * @param missionId ID de la misión
      * @return Progreso de misión completada
      */
-    MissionDtos.MissionProgressResponse completeMission(Long userId, Long missionId);
+    MissionDtos.MissionProgressResponse completeMission(UUID userId, Long missionId);
 
     /**
      * Verifica automáticamente si las misiones activas del usuario deben completarse
@@ -90,7 +91,7 @@ public interface MissionService {
      * @param userId ID del usuario
      * @return Lista de misiones que fueron completadas automáticamente
      */
-    List<MissionDtos.MissionProgressResponse> checkAndCompleteMissions(Long userId);
+    List<MissionDtos.MissionProgressResponse> checkAndCompleteMissions(UUID userId);
 
     /**
      * Genera misiones para una semana específica desde los templates
@@ -134,5 +135,5 @@ public interface MissionService {
      * @param category Categoría de emisión (ELECTRICITY, TRANSPORT, WASTE)
      * @return Valor promedio de las últimas 4 semanas
      */
-    java.math.BigDecimal calculateBaseline(Long userId, Mission.MissionCategory category);
+    java.math.BigDecimal calculateBaseline(UUID userId, Mission.MissionCategory category);
 }

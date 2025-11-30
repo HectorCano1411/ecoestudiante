@@ -13,6 +13,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repositorio para el acceso a datos de Progreso de Misiones.
@@ -54,7 +55,7 @@ public class MissionProgressRepository {
     /**
      * Busca el progreso de un usuario en una misión específica
      */
-    public Optional<MissionProgress> findByUserAndMission(Long userId, Long missionId) {
+    public Optional<MissionProgress> findByUserAndMission(UUID userId, Long missionId) {
         String sql = """
                 SELECT id, user_id, mission_id, current_progress, target_progress,
                        status, started_at, completed_at, baseline_value
@@ -73,7 +74,7 @@ public class MissionProgressRepository {
     /**
      * Obtiene todas las misiones activas de un usuario
      */
-    public List<MissionProgress> findActiveByUserId(Long userId) {
+    public List<MissionProgress> findActiveByUserId(UUID userId) {
         String sql = """
                 SELECT id, user_id, mission_id, current_progress, target_progress,
                        status, started_at, completed_at, baseline_value
@@ -88,7 +89,7 @@ public class MissionProgressRepository {
     /**
      * Obtiene todas las misiones completadas de un usuario
      */
-    public List<MissionProgress> findCompletedByUserId(Long userId) {
+    public List<MissionProgress> findCompletedByUserId(UUID userId) {
         String sql = """
                 SELECT id, user_id, mission_id, current_progress, target_progress,
                        status, started_at, completed_at, baseline_value
@@ -103,7 +104,7 @@ public class MissionProgressRepository {
     /**
      * Obtiene todas las misiones de un usuario (cualquier estado)
      */
-    public List<MissionProgress> findAllByUserId(Long userId) {
+    public List<MissionProgress> findAllByUserId(UUID userId) {
         String sql = """
                 SELECT id, user_id, mission_id, current_progress, target_progress,
                        status, started_at, completed_at, baseline_value
@@ -118,7 +119,7 @@ public class MissionProgressRepository {
     /**
      * Obtiene misiones por usuario y estado
      */
-    public List<MissionProgress> findByUserIdAndStatus(Long userId, MissionStatus status) {
+    public List<MissionProgress> findByUserIdAndStatus(UUID userId, MissionStatus status) {
         String sql = """
                 SELECT id, user_id, mission_id, current_progress, target_progress,
                        status, started_at, completed_at, baseline_value
@@ -133,7 +134,7 @@ public class MissionProgressRepository {
     /**
      * Cuenta misiones completadas por usuario en un rango de fechas
      */
-    public int countCompletedByUserBetweenDates(Long userId, java.time.LocalDateTime startDate, java.time.LocalDateTime endDate) {
+    public int countCompletedByUserBetweenDates(UUID userId, java.time.LocalDateTime startDate, java.time.LocalDateTime endDate) {
         String sql = """
                 SELECT COUNT(*) FROM mission_progress
                 WHERE user_id = ?
@@ -171,8 +172,8 @@ public class MissionProgressRepository {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, progress.getUserId());
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+            ps.setObject(1, progress.getUserId());
             ps.setLong(2, progress.getMissionId());
             ps.setBigDecimal(3, progress.getCurrentProgress());
             ps.setBigDecimal(4, progress.getTargetProgress());
@@ -278,7 +279,7 @@ public class MissionProgressRepository {
     /**
      * Verifica si existe un progreso para usuario y misión
      */
-    public boolean existsByUserAndMission(Long userId, Long missionId) {
+    public boolean existsByUserAndMission(UUID userId, Long missionId) {
         String sql = "SELECT COUNT(*) FROM mission_progress WHERE user_id = ? AND mission_id = ?";
         Integer count = jdbc.queryForObject(sql, Integer.class, userId, missionId);
         return count != null && count > 0;
@@ -292,7 +293,7 @@ public class MissionProgressRepository {
             MissionProgress progress = new MissionProgress();
 
             progress.setId(rs.getLong("id"));
-            progress.setUserId(rs.getLong("user_id"));
+            progress.setUserId((UUID) rs.getObject("user_id"));
             progress.setMissionId(rs.getLong("mission_id"));
             progress.setCurrentProgress(rs.getBigDecimal("current_progress"));
             progress.setTargetProgress(rs.getBigDecimal("target_progress"));

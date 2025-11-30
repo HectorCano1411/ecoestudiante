@@ -143,7 +143,7 @@ public class MissionRepository {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
             ps.setString(1, mission.getTitle());
             ps.setString(2, mission.getDescription());
             ps.setString(3, mission.getCategory().name());

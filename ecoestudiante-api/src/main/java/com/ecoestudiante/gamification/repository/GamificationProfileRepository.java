@@ -12,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repositorio para el acceso a datos de Perfiles de Gamificación.
@@ -37,7 +38,7 @@ public class GamificationProfileRepository {
      * @param userId ID del usuario
      * @return Optional con el perfil encontrado o vacío
      */
-    public Optional<GamificationProfile> findByUserId(Long userId) {
+    public Optional<GamificationProfile> findByUserId(UUID userId) {
         String sql = """
                 SELECT id, user_id, total_xp, current_level, current_streak, best_streak,
                        last_activity_date, created_at, updated_at
@@ -122,8 +123,8 @@ public class GamificationProfileRepository {
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setLong(1, profile.getUserId());
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+            ps.setObject(1, profile.getUserId());
             ps.setLong(2, profile.getTotalXp() != null ? profile.getTotalXp() : 0L);
             ps.setInt(3, profile.getCurrentLevel() != null ? profile.getCurrentLevel() : 1);
             ps.setInt(4, profile.getCurrentStreak() != null ? profile.getCurrentStreak() : 0);
@@ -178,7 +179,7 @@ public class GamificationProfileRepository {
      * @param xpAmount Cantidad de XP a agregar (puede ser negativo)
      * @return Número de filas afectadas
      */
-    public int addXp(Long userId, int xpAmount) {
+    public int addXp(UUID userId, int xpAmount) {
         String sql = """
                 UPDATE gamification_profiles
                 SET total_xp = total_xp + ?,
@@ -196,7 +197,7 @@ public class GamificationProfileRepository {
      * @param newStreak   Nuevo valor del streak
      * @return Número de filas afectadas
      */
-    public int updateStreak(Long userId, int newStreak) {
+    public int updateStreak(UUID userId, int newStreak) {
         String sql = """
                 UPDATE gamification_profiles
                 SET current_streak = ?,
@@ -214,7 +215,7 @@ public class GamificationProfileRepository {
      * @param activityDate   Nueva fecha de actividad
      * @return Número de filas afectadas
      */
-    public int updateLastActivity(Long userId, java.time.LocalDate activityDate) {
+    public int updateLastActivity(UUID userId, java.time.LocalDate activityDate) {
         String sql = """
                 UPDATE gamification_profiles
                 SET last_activity_date = ?,
@@ -231,7 +232,7 @@ public class GamificationProfileRepository {
      * @param userId ID del usuario
      * @return Número de filas eliminadas
      */
-    public int deleteByUserId(Long userId) {
+    public int deleteByUserId(UUID userId) {
         String sql = "DELETE FROM gamification_profiles WHERE user_id = ?";
         return jdbc.update(sql, userId);
     }
@@ -242,7 +243,7 @@ public class GamificationProfileRepository {
      * @param userId ID del usuario
      * @return true si existe, false en caso contrario
      */
-    public boolean existsByUserId(Long userId) {
+    public boolean existsByUserId(UUID userId) {
         String sql = "SELECT COUNT(*) FROM gamification_profiles WHERE user_id = ?";
         Integer count = jdbc.queryForObject(sql, Integer.class, userId);
         return count != null && count > 0;
@@ -256,7 +257,7 @@ public class GamificationProfileRepository {
             GamificationProfile profile = new GamificationProfile();
 
             profile.setId(rs.getLong("id"));
-            profile.setUserId(rs.getLong("user_id"));
+            profile.setUserId((UUID) rs.getObject("user_id"));
             profile.setTotalXp(rs.getLong("total_xp"));
             profile.setCurrentLevel(rs.getInt("current_level"));
             profile.setCurrentStreak(rs.getInt("current_streak"));

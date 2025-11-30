@@ -1,6 +1,7 @@
 package com.ecoestudiante.gamification.service;
 
 import com.ecoestudiante.gamification.dto.MissionDtos;
+import java.util.UUID;
 
 /**
  * Interfaz del servicio de Leaderboard (Ranking).
@@ -38,7 +39,7 @@ public interface LeaderboardService {
      * @param userId ID del usuario
      * @return Entrada del leaderboard del usuario
      */
-    MissionDtos.LeaderboardEntryResponse getUserPosition(Long userId);
+    MissionDtos.LeaderboardEntryResponse getUserPosition(UUID userId);
 
     /**
      * Obtiene la posición de un usuario en una semana específica
@@ -48,7 +49,7 @@ public interface LeaderboardService {
      * @param year Año
      * @return Entrada del leaderboard del usuario
      */
-    MissionDtos.LeaderboardEntryResponse getUserPositionInWeek(Long userId, String weekNumber, Integer year);
+    MissionDtos.LeaderboardEntryResponse getUserPositionInWeek(UUID userId, String weekNumber, Integer year);
 
     /**
      * Recalcula el leaderboard de la semana actual
@@ -75,7 +76,7 @@ public interface LeaderboardService {
      * @param weekNumber Número de semana ISO
      * @param year Año
      */
-    void updateUserLeaderboardEntry(Long userId, String weekNumber, Integer year);
+    void updateUserLeaderboardEntry(UUID userId, String weekNumber, Integer year);
 
     /**
      * Calcula los kg de CO₂ evitados por un usuario en una semana
@@ -86,5 +87,5 @@ public interface LeaderboardService {
      * @param year Año
      * @return kg de CO₂ evitados (puede ser negativo si aumentó emisiones)
      */
-    java.math.BigDecimal calculateCo2AvoidedForWeek(Long userId, String weekNumber, Integer year);
+    java.math.BigDecimal calculateCo2AvoidedForWeek(UUID userId, String weekNumber, Integer year);
 }

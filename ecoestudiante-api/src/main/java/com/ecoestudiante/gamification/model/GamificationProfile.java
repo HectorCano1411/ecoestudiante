@@ -3,6 +3,7 @@ package com.ecoestudiante.gamification.model;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Modelo de dominio para el Perfil de Gamificación del usuario.
@@ -27,10 +28,10 @@ public class GamificationProfile {
     private Long id;
 
     /**
-     * ID del usuario (FK a users.id)
-     * Relación 1:1 con la tabla users
+     * ID del usuario (FK a app_user.id)
+     * Relación 1:1 con la tabla app_user
      */
-    private Long userId;
+    private UUID userId;
 
     /**
      * Experiencia total acumulada por el usuario

@@ -2,6 +2,7 @@ package com.ecoestudiante.gamification.model;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Modelo de dominio para Transacciones de XP.
@@ -29,9 +30,9 @@ public class XpTransaction {
     private Long id;
 
     /**
-     * ID del usuario que recibe/pierde XP (FK a users.id)
+     * ID del usuario que recibe/pierde XP (FK a app_user.id)
      */
-    private Long userId;
+    private UUID userId;
 
     /**
      * Cantidad de XP
