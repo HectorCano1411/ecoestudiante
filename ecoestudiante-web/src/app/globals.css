@@ -75,3 +75,230 @@ textarea::placeholder {
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+
+/* =============================================================================
+   FILTERS PANEL - ENTERPRISE STYLES - NUCLEAR OVERRIDE
+   NextUI Select Component Override - MAXIMUM SPECIFICITY + CSS Variables
+   Architecture: Multi-selector strategy with !important cascade
+   ============================================================================= */
+
+/* CSS VARIABLES - Force dark theme colors */
+:root {
+  --nextui-dropdown-bg: #0f172a;
+  --nextui-dropdown-border: #10b981;
+  --nextui-item-text: #ffffff;
+  --nextui-item-hover: #334155;
+  --nextui-item-selected: #10b981;
+}
+
+/* DROPDOWN POPOVERS - NUCLEAR SPECIFICITY */
+div[data-slot="popover-content"],
+div.nextui-popover-content,
+div[role="listbox"],
+[data-slot="base"] [data-slot="popover-content"],
+button + div[data-slot="popover-content"],
+.filter-dropdown-1 div[data-slot="popover-content"],
+.filter-dropdown-2 div[data-slot="popover-content"],
+.filter-dropdown-3 div[data-slot="popover-content"],
+.filter-dropdown-4 div[data-slot="popover-content"],
+.filter-dropdown-5 div[data-slot="popover-content"],
+.filter-dropdown-6 div[data-slot="popover-content"] {
+  background: var(--nextui-dropdown-bg) !important;
+  background-color: var(--nextui-dropdown-bg) !important;
+  border: 2px solid var(--nextui-dropdown-border) !important;
+  border-color: var(--nextui-dropdown-border) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  z-index: 9999 !important;
+}
+
+[data-slot="listbox"],
+.nextui-listbox {
+  background-color: #0f172a !important;
+  padding: 4px !important;
+}
+
+/* SELECT ITEMS - NUCLEAR SPECIFICITY FOR WHITE TEXT */
+li[data-slot="list-item"],
+li[role="option"],
+li.nextui-list-item,
+li[data-key],
+[data-slot="listbox"] li,
+[role="listbox"] li,
+div[data-slot="listbox"] > li,
+ul[role="listbox"] > li,
+[data-slot="popover-content"] li,
+[data-slot="popover-content"] [role="option"] {
+  color: var(--nextui-item-text) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  padding: 10px 12px !important;
+  margin-bottom: 4px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 150ms ease-in-out !important;
+}
+
+/* Force white text on all child elements */
+[data-slot="list-item"] *,
+[role="option"] *,
+[data-slot="popover-content"] li *,
+[role="listbox"] li * {
+  color: var(--nextui-item-text) !important;
+}
+
+/* HOVER STATE - NUCLEAR */
+li[data-slot="list-item"]:hover,
+li[role="option"]:hover,
+li.nextui-list-item:hover,
+li[data-key]:hover,
+li[data-hover="true"],
+[data-slot="popover-content"] li:hover,
+[role="listbox"] li:hover {
+  background: var(--nextui-item-hover) !important;
+  background-color: var(--nextui-item-hover) !important;
+  color: var(--nextui-item-text) !important;
+  transform: translateX(2px) !important;
+}
+
+/* Force white text on hover children */
+li:hover *,
+[data-hover="true"] * {
+  color: var(--nextui-item-text) !important;
+}
+
+/* SELECTED STATE - NUCLEAR */
+li[data-slot="list-item"][data-selected="true"],
+li[role="option"][aria-selected="true"],
+li[data-selected="true"],
+li.nextui-list-item-selected,
+[data-slot="popover-content"] li[data-selected="true"],
+[role="listbox"] li[aria-selected="true"] {
+  background: var(--nextui-item-selected) !important;
+  background-color: var(--nextui-item-selected) !important;
+  color: var(--nextui-item-text) !important;
+  font-weight: 700 !important;
+}
+
+/* Force white text on selected children */
+li[data-selected="true"] *,
+li[aria-selected="true"] * {
+  color: var(--nextui-item-text) !important;
+}
+
+/* Selected + Hover */
+[data-slot="list-item"][data-selected="true"]:hover,
+[role="option"][aria-selected="true"]:hover {
+  background-color: #059669 !important; /* emerald-700 */
+  color: #ffffff !important;
+}
+
+/* SELECT TRIGGER - White background fields */
+[data-slot="trigger"],
+[data-slot="selector"],
+.nextui-select-trigger {
+  background-color: #ffffff !important;
+  border: 2px solid #cbd5e1 !important; /* slate-300 */
+  border-radius: 12px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  transition: all 200ms ease-in-out !important;
+}
+
+[data-slot="trigger"]:hover,
+[data-slot="selector"]:hover {
+  border-color: #10b981 !important; /* emerald-500 */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* LABELS - Dark text with maximum contrast */
+[data-slot="label"],
+.nextui-select-label,
+label[data-slot="label"] {
+  color: #0f172a !important; /* slate-900 */
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  margin-bottom: 6px !important;
+}
+
+/* VALUE DISPLAY */
+[data-slot="value"],
+.nextui-select-value {
+  color: #1e293b !important; /* slate-800 */
+  font-weight: 600 !important;
+  font-size: 15px !important;
+}
+
+/* CUSTOM SCROLLBAR */
+[data-slot="popover-content"]::-webkit-scrollbar,
+[role="listbox"]::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+[data-slot="popover-content"]::-webkit-scrollbar-track,
+[role="listbox"]::-webkit-scrollbar-track {
+  background: #1e293b !important;
+  border-radius: 4px !important;
+}
+
+[data-slot="popover-content"]::-webkit-scrollbar-thumb,
+[role="listbox"]::-webkit-scrollbar-thumb {
+  background: #475569 !important;
+  border-radius: 4px !important;
+}
+
+[data-slot="popover-content"]::-webkit-scrollbar-thumb:hover,
+[role="listbox"]::-webkit-scrollbar-thumb:hover {
+  background: #64748b !important;
+}
+
+/* Z-INDEX MANAGEMENT - Progressive to prevent overlap */
+.filter-dropdown-1 [data-slot="popover-content"] { z-index: 100 !important; }
+.filter-dropdown-2 [data-slot="popover-content"] { z-index: 90 !important; }
+.filter-dropdown-3 [data-slot="popover-content"] { z-index: 80 !important; }
+.filter-dropdown-4 [data-slot="popover-content"] { z-index: 70 !important; }
+.filter-dropdown-5 [data-slot="popover-content"] { z-index: 60 !important; }
+.filter-dropdown-6 [data-slot="popover-content"] { z-index: 50 !important; }
+
+/* ANIMATIONS */
+@keyframes slideDownAndFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-slot="popover-content"] {
+  animation: slideDownAndFade 150ms ease-out !important;
+}
+
+/* ACCESSIBILITY - Keyboard focus */
+[data-slot="list-item"]:focus-visible,
+[role="option"]:focus-visible {
+  outline: 3px solid #10b981 !important;
+  outline-offset: 2px !important;
+  background-color: #334155 !important;
+}
+
+/* RESPONSIVE - Mobile optimizations */
+@media (max-width: 768px) {
+  [data-slot="popover-content"] {
+    max-height: 240px !important;
+  }
+
+  [data-slot="trigger"] {
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+}

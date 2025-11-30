@@ -28,6 +28,20 @@ export interface ElectricityInput {
   schedule?: 'diurna' | 'vespertina';
 }
 
+export interface WasteItem {
+  wasteType: 'organic' | 'paper' | 'plastic' | 'glass' | 'metal' | 'other';
+  weightKg: number;
+}
+
+export interface WasteInput {
+  wasteItems: WasteItem[];
+  disposalMethod: 'mixed' | 'recycling' | 'composting' | 'landfill';
+  country: string;
+  period: string;
+  idempotencyKey: string;
+  userId: string;
+}
+
 export interface CalcResult {
   calcId: string;
   kgCO2e: number;
@@ -73,6 +87,9 @@ export interface CalcHistoryItem {
     selectedAppliances?: string[];
     career?: string;
     schedule?: string;
+    // Residuos (Waste)
+    wasteItems?: WasteItem[];
+    disposalMethod?: 'mixed' | 'recycling' | 'composting' | 'landfill';
     // Otros campos comunes
     [key: string]: unknown;
   };

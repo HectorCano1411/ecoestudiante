@@ -1,0 +1,246 @@
+# =============================================================================
+# EcoEstudiante - Docker Compose para DESARROLLO
+# =============================================================================
+# Configuración optimizada para desarrollo con HOT RELOAD:
+# - Frontend: Next.js dev server con volúmenes montados
+# - Backend: Spring Boot DevTools con volúmenes montados
+# - Gateway: Spring Boot DevTools con volúmenes montados
+#
+# Uso:
+#   docker-compose -f docker-compose.dev.yml up
+#   docker-compose -f docker-compose.dev.yml up -d
+#   docker-compose -f docker-compose.dev.yml down
+#
+# IMPORTANTE: Los cambios en el código se reflejan automáticamente
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database (igual que producción)
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: eco-postgres-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecoestudiante}
+      POSTGRES_USER: ${POSTGRES_USER:-eco}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eco}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eco} -d ${POSTGRES_DB:-ecoestudiante}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ecoestudiante-dev-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # pgAdmin (igual que producción)
+  # ===========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eco-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@ecoestudiante.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecoestudiante-dev-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Redis (igual que producción)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: eco-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ecoestudiante-dev-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Backend API (Spring Boot) - MODO DESARROLLO
+  # ===========================================================================
+  api:
+    image: maven:3.9-eclipse-temurin-17
+    container_name: eco-api-dev
+    working_dir: /app
+    command: >
+      bash -c "
+        echo '⏳ Instalando dependencias del API...'
+        mvn dependency:go-offline -B 2>/dev/null || true
+        echo '🚀 Iniciando API en modo desarrollo con DevTools...'
+        mvn spring-boot:run -Dspring-boot.run.profiles=docker
+      "
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ecoestudiante}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-eco}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-eco}
+      JWT_SECRET: ${JWT_SECRET:-YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+      # DevTools habilitado
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "true"
+      # Auth0 (opcional)
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://api.ecoestudiante.com}
+      # Email (opcional)
+      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    ports:
+      - "18080:8080"
+      - "35729:35729"  # Puerto LiveReload
+    volumes:
+      # Montar código fuente (HOT RELOAD)
+      - ./ecoestudiante-api:/app:rw
+      # Cache de Maven para acelerar builds
+      - maven_cache:/root/.m2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ecoestudiante-dev-network
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # ===========================================================================
+  # API Gateway (Spring Cloud Gateway) - MODO DESARROLLO
+  # ===========================================================================
+  gateway:
+    image: maven:3.9-eclipse-temurin-17
+    container_name: eco-gateway-dev
+    working_dir: /app
+    command: >
+      bash -c "
+        echo '⏳ Instalando dependencias del Gateway...'
+        mvn dependency:go-offline -B 2>/dev/null || true
+        echo '🚀 Iniciando Gateway en modo desarrollo con DevTools...'
+        mvn spring-boot:run -Dspring-boot.run.profiles=docker
+      "
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BACKEND_API_URL: http://api:8080
+      JWT_SECRET: ${JWT_SECRET:-YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+      # DevTools habilitado
+      SPRING_DEVTOOLS_RESTART_ENABLED: "true"
+      SPRING_DEVTOOLS_LIVERELOAD_ENABLED: "true"
+      # Auth0 (opcional)
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-https://api.ecoestudiante.com}
+      # Redis para rate limiting
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      # PostgreSQL R2DBC Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ecoestudiante}
+      DB_USERNAME: ${POSTGRES_USER:-eco}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-eco}
+    ports:
+      - "8888:8080"
+      - "35730:35729"  # Puerto LiveReload
+    volumes:
+      # Montar código fuente (HOT RELOAD)
+      - ./ecoestudiante-gateway:/app:rw
+      # Cache de Maven para acelerar builds
+      - maven_cache:/root/.m2
+    depends_on:
+      - api
+      - redis
+    networks:
+      - ecoestudiante-dev-network
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # ===========================================================================
+  # Frontend Web (Next.js) - MODO DESARROLLO
+  # ===========================================================================
+  web:
+    image: node:20-alpine
+    container_name: eco-web-dev
+    working_dir: /app
+    command: >
+      sh -c "
+        echo '⏳ Instalando dependencias del frontend...'
+        npm ci --legacy-peer-deps
+        echo '🚀 Iniciando Next.js en modo desarrollo...'
+        npm run dev
+      "
+    environment:
+      NODE_ENV: development
+      # API Gateway URL (para SSR server-side)
+      GATEWAY_BASE_URL: http://gateway:8080
+      # API Gateway URL (para cliente browser)
+      NEXT_PUBLIC_API_URL: http://localhost:8888
+      # Mapbox (para mapas de movilidad)
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+      # Auth0 (opcional - solo si están TODAS las variables configuradas)
+      AUTH0_SECRET: ${AUTH0_SECRET:-}
+      AUTH0_BASE_URL: ${AUTH0_BASE_URL:-http://localhost:3000}
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL:-}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:-}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
+      # Next.js dev server
+      WATCHPACK_POLLING: "true"  # Para WSL2/Docker
+    ports:
+      - "3000:3000"
+    volumes:
+      # Montar código fuente (HOT RELOAD)
+      - ./ecoestudiante-web:/app:rw
+      # Excluir node_modules para mejor rendimiento
+      - /app/node_modules
+      # Cache de Next.js
+      - nextjs_cache:/app/.next
+    depends_on:
+      - gateway
+    networks:
+      - ecoestudiante-dev-network
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+# =============================================================================
+# Volumes para desarrollo
+# =============================================================================
+volumes:
+  postgres_dev_data:
+    name: ecoestudiante-postgres-dev-data
+  pgadmin_dev_data:
+    name: ecoestudiante-pgadmin-dev-data
+  maven_cache:
+    name: ecoestudiante-maven-cache
+  nextjs_cache:
+    name: ecoestudiante-nextjs-cache
+
+# =============================================================================
+# Networks para desarrollo
+# =============================================================================
+networks:
+  ecoestudiante-dev-network:
+    name: ecoestudiante-dev-network
+    driver: bridge

@@ -3,9 +3,40 @@ import withPWA from 'next-pwa';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  
+
   // Configuración para PWA y Docker
   output: 'standalone',
+
+  // CRÍTICO: Deshabilitar prefetch completamente (evita CORS con Auth0)
+  experimental: {
+    // @ts-ignore - Esta opción existe pero puede no estar en los tipos
+    disableOptimizedLoading: true,
+  },
+
+  // CRÍTICO: Deshabilitar prefetch de rutas Auth0 (evita CORS)
+  async headers() {
+    return [
+      {
+        source: '/api/auth/:path*',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow',
+          },
+          // Indica a Next.js que NO haga prefetch de estas rutas
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          },
+          // CRÍTICO: Bloquear CORS para evitar prefetch
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+        ],
+      },
+    ];
+  },
 
   // Proxy /api/* -> Gateway Spring Cloud Gateway (puerto 8888)
   // NOTA: Los route handlers de Next.js usan backendFetch que apunta al Gateway

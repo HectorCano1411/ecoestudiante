@@ -52,8 +52,8 @@ export default function DashboardMenu({ onItemClick }: DashboardMenuProps) {
       title: 'Residuos',
       description: 'Registra tu generación de residuos',
       icon: '🗑️',
-      color: 'bg-gray-500',
-      available: false,
+      color: 'bg-purple-600',
+      available: true,
     },
     {
       id: 'other',

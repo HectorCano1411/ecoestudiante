@@ -166,13 +166,84 @@ public class CalcController {
     return svc.computeTransport(normalized);
   }
 
+  @PostMapping(
+      path = "/waste",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE
+  )
+  @Operation(
+      summary = "Calcula kgCO2e para residuos/desechos (idempotente por Idempotency-Key)",
+      description = """
+          Calcula emisiones de carbono para diferentes tipos de residuos.
+          Metodología Híbrida (EPA WARM + GHG Protocol).
+          La operación es idempotente por la combinación (userId, Idempotency-Key).
+          Tipos de residuos soportados: organic, paper, plastic, glass, metal, other.
+          Métodos de disposición: mixed, recycling, composting, landfill.
+          """
+  )
+  @SecurityRequirement(name = "bearerAuth")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Cálculo exitoso",
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = CalcDtos.CalcResult.class)
+          )
+      ),
+      @ApiResponse(responseCode = "400", description = "Solicitud inválida / validación fallida"),
+      @ApiResponse(responseCode = "422", description = "Datos válidos pero no procesables"),
+      @ApiResponse(responseCode = "500", description = "Error interno")
+  })
+  public CalcDtos.CalcResult waste(
+      @RequestHeader(name = "Idempotency-Key", required = false) String idemHeader,
+      @Valid @RequestBody CalcDtos.WasteInput in,
+      HttpServletRequest request
+  ) {
+    // Extraer userId del token si no está en el body o está vacío
+    String userId = in.userId();
+    String normalizedUserId;
+
+    if (userId == null || userId.isBlank()) {
+      // Si no viene userId en el body, extraerlo del token
+      UserContext context = userContextResolver.resolve(request);
+      normalizedUserId = context.normalizedUserIdAsString();
+      userId = context.userId();
+      logger.debug("UserId extraído del token - original: {}, normalizado: {}", userId, normalizedUserId);
+    } else {
+      // Si viene userId en el body, normalizarlo
+      normalizedUserId = userContextResolver.normalizeUserId(userId);
+      logger.debug("UserId del body normalizado - original: {}, normalizado: {}", userId, normalizedUserId);
+    }
+
+    // Validación adicional para asegurar que el userId no es null
+    if (userId == null || userId.isBlank() || normalizedUserId == null || normalizedUserId.isBlank()) {
+      throw new IllegalArgumentException("No se pudo obtener el userId del token o del body");
+    }
+
+    // Crear nuevo input con userId normalizado
+    var normalized = new CalcDtos.WasteInput(
+        in.wasteItems(),
+        in.disposalMethod() != null && !in.disposalMethod().isBlank() ? in.disposalMethod() : "mixed",
+        in.country(),
+        in.period(),
+        idemHeader != null && !idemHeader.isBlank() ? idemHeader : in.idempotencyKey(),
+        normalizedUserId
+    );
+
+    logger.debug("Procesando cálculo de residuos - items: {}, disposalMethod: {}, country: {}, period: {}",
+        in.wasteItems().size(), in.disposalMethod(), in.country(), in.period());
+
+    return svc.computeWaste(normalized);
+  }
+
   @GetMapping(
       path = "/history",
       produces = MediaType.APPLICATION_JSON_VALUE
   )
   @Operation(
       summary = "Obtener historial de cálculos",
-      description = "Retorna el historial de cálculos del usuario autenticado con paginación"
+      description = "Retorna el historial de cálculos del usuario autenticado con paginación y filtros opcionales"
   )
   @SecurityRequirement(name = "bearerAuth")
   @ApiResponses({
@@ -191,12 +262,40 @@ public class CalcController {
       @RequestParam(value = "category", required = false) String category,
       @RequestParam(value = "page", defaultValue = "0") int page,
       @RequestParam(value = "pageSize", defaultValue = "20") int pageSize,
+      @RequestParam(value = "dateFrom", required = false) String dateFrom,
+      @RequestParam(value = "dateTo", required = false) String dateTo,
+      @RequestParam(value = "emissionMin", required = false) Double emissionMin,
+      @RequestParam(value = "emissionMax", required = false) Double emissionMax,
+      @RequestParam(value = "subcategories", required = false) java.util.List<String> subcategories,
       HttpServletRequest request
   ) {
     UserContext context = userContextResolver.resolve(request);
     String userId = context.normalizedUserIdAsString();
-    logger.info("Obteniendo historial para usuario: {}, categoría: {}, página: {}", userId, category, page);
-    return svc.getHistory(userId, category, page, pageSize);
+
+    // Parsear fechas si se proporcionaron
+    java.time.LocalDate parsedDateFrom = null;
+    java.time.LocalDate parsedDateTo = null;
+
+    if (dateFrom != null && !dateFrom.isBlank()) {
+      try {
+        parsedDateFrom = java.time.LocalDate.parse(dateFrom);
+      } catch (Exception e) {
+        logger.warn("Formato de fecha inválido para dateFrom: {}", dateFrom);
+      }
+    }
+
+    if (dateTo != null && !dateTo.isBlank()) {
+      try {
+        parsedDateTo = java.time.LocalDate.parse(dateTo);
+      } catch (Exception e) {
+        logger.warn("Formato de fecha inválido para dateTo: {}", dateTo);
+      }
+    }
+
+    logger.info("Obteniendo historial - usuario: {}, categoría: {}, página: {}, filtros: [dateFrom={}, dateTo={}, emissionMin={}, emissionMax={}, subcategories={}]",
+        userId, category, page, parsedDateFrom, parsedDateTo, emissionMin, emissionMax, subcategories);
+
+    return svc.getHistory(userId, category, page, pageSize, parsedDateFrom, parsedDateTo, emissionMin, emissionMax, subcategories);
   }
 }
 

@@ -1,15 +1,42 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo, ReactNode } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { BarChart } from '@mui/x-charts/BarChart';
-import { PieChart } from '@mui/x-charts/PieChart';
-import { LineChart } from '@mui/x-charts/LineChart';
+import dynamic from 'next/dynamic';
 import { api } from '@/lib/api-client';
+import SummaryCards from '@/components/analytics/SummaryCards';
+import FiltersPanel from '@/components/analytics/FiltersPanel';
+import CategorySidebar from '@/components/analytics/CategorySidebar';
 
-type ValueFormatter<T = number | null> = (value: T) => string;
+// ECharts components - Dynamic imports to avoid SSR issues
+const TimeSeriesLineChart = dynamic(() => import('@/components/charts/TimeSeriesLineChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 h-96 flex items-center justify-center">
+      <div className="animate-pulse text-gray-600 font-medium">Cargando gráfico...</div>
+    </div>
+  ),
+});
+
+const CategoryPieChart = dynamic(() => import('@/components/charts/CategoryPieChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 h-96 flex items-center justify-center">
+      <div className="animate-pulse text-gray-600 font-medium">Cargando gráfico...</div>
+    </div>
+  ),
+});
+
+const CategoryBarChart = dynamic(() => import('@/components/charts/CategoryBarChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 h-96 flex items-center justify-center">
+      <div className="animate-pulse text-gray-600 font-medium">Cargando gráfico...</div>
+    </div>
+  ),
+});
 
 interface TimeSeriesDataPoint {
   period: string;
@@ -46,45 +73,158 @@ interface StatsSummary {
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 
-interface ResponsiveChartProps {
-  height: number;
-  children: (width: number) => ReactNode;
+// ============================================================================
+// 🎭 MOCK DATA MODE - TEMPORARY FOR TESTING ECHARTS
+// ============================================================================
+const USE_MOCK_DATA = false; // Using real API data
+
+// Interfaz para datos raw del historial
+interface CalcHistoryItem {
+  calcId: string;
+  category: string;
+  subcategory: string | null;
+  input: any;
+  kgCO2e: number;
+  createdAt: string;
 }
 
-function ResponsiveChart({ height, children }: ResponsiveChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
+interface CalcHistoryResponse {
+  items: CalcHistoryItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 
-  useEffect(() => {
-    const element = containerRef.current;
-    if (!element) return;
+// ============================================================================
+// 🎭 MOCK DATA GENERATORS
+// ============================================================================
 
-    const updateWidth = () => setWidth(element.clientWidth);
-    updateWidth();
+function generateMockSummary(): StatsSummary {
+  return {
+    totalKgCO2e: 856.42,
+    totalRecords: 127,
+    thisMonthKgCO2e: 78.34,
+    lastMonthKgCO2e: 65.21,
+    averagePerMonth: 71.37,
+  };
+}
 
-    if (typeof window === 'undefined') {
-      return;
-    }
+function generateMockCategoryData(): StatsByCategoryResponse {
+  return {
+    categories: [
+      { category: 'transporte', totalKgCO2e: 387.65, recordCount: 52, percentage: 45.3 },
+      { category: 'electricidad', totalKgCO2e: 298.43, recordCount: 48, percentage: 34.8 },
+      { category: 'residuos', totalKgCO2e: 170.34, recordCount: 27, percentage: 19.9 },
+    ],
+    totalKgCO2e: 856.42,
+  };
+}
 
-    if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver((entries) => {
-        if (!entries.length) return;
-        setWidth(entries[0].contentRect.width);
+function generateMockTimeSeriesData(groupBy: 'month' | 'day', months: number): TimeSeriesResponse {
+  const data: TimeSeriesDataPoint[] = [];
+  const now = new Date();
+
+  if (groupBy === 'month') {
+    for (let i = months - 1; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const baseEmission = 60 + Math.random() * 40;
+      const seasonalVariation = Math.sin((date.getMonth() / 12) * Math.PI * 2) * 15;
+
+      data.push({
+        period,
+        totalKgCO2e: baseEmission + seasonalVariation,
+        recordCount: Math.floor(8 + Math.random() * 8),
       });
-      observer.observe(element);
-      return () => observer.disconnect();
+    }
+  } else {
+    // Last 30 days
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const period = date.toISOString().split('T')[0];
+      const baseEmission = 2 + Math.random() * 4;
+
+      data.push({
+        period,
+        totalKgCO2e: baseEmission,
+        recordCount: Math.floor(Math.random() * 5),
+      });
+    }
+  }
+
+  const totalKgCO2e = data.reduce((sum, d) => sum + d.totalKgCO2e, 0);
+  return { data, groupBy, totalKgCO2e };
+}
+
+function generateMockAvailableCategories(): Record<string, string[]> {
+  return {
+    transporte: ['car_gasoline', 'car_electric', 'bus', 'metro', 'bicycle', 'walking'],
+    electricidad: ['laptop', 'desktop', 'monitor', 'lampara', 'ventilador', 'router'],
+    residuos: ['organic_composting', 'plastic_recycling', 'paper_recycling', 'glass_recycling'],
+  };
+}
+
+function generateMockRawHistoryData(): CalcHistoryItem[] {
+  const items: CalcHistoryItem[] = [];
+  const categories = ['transporte', 'electricidad', 'residuos'];
+  const now = new Date();
+
+  // Generate 100 mock records over the past 6 months
+  for (let i = 0; i < 100; i++) {
+    const daysAgo = Math.floor(Math.random() * 180);
+    const date = new Date(now);
+    date.setDate(date.getDate() - daysAgo);
+
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    let input: any = {};
+    let kgCO2e = 0;
+    let subcategory = null;
+
+    if (category === 'transporte') {
+      const modes = ['car_gasoline', 'car_electric', 'bus', 'metro', 'bicycle'];
+      const mode = modes[Math.floor(Math.random() * modes.length)];
+      const [transportMode, fuelType] = mode.split('_');
+      input = {
+        transportMode,
+        fuelType: fuelType || null,
+        distance: 5 + Math.random() * 20,
+      };
+      kgCO2e = mode.includes('car_gasoline') ? 2 + Math.random() * 5 : 0.5 + Math.random() * 2;
+      subcategory = mode;
+    } else if (category === 'electricidad') {
+      const appliances = ['laptop', 'desktop', 'monitor', 'lampara', 'ventilador'];
+      const selected = [appliances[Math.floor(Math.random() * appliances.length)]];
+      input = {
+        selectedAppliances: selected,
+        hoursPerDay: 4 + Math.random() * 8,
+      };
+      kgCO2e = 1 + Math.random() * 4;
+      subcategory = selected[0];
+    } else if (category === 'residuos') {
+      const wasteTypes = ['organic', 'plastic', 'paper', 'glass'];
+      const wasteType = wasteTypes[Math.floor(Math.random() * wasteTypes.length)];
+      const methods = ['composting', 'recycling', 'landfill'];
+      const disposalMethod = methods[Math.floor(Math.random() * methods.length)];
+      input = {
+        wasteItems: [{ wasteType, kg: 1 + Math.random() * 5 }],
+        disposalMethod,
+      };
+      kgCO2e = 0.5 + Math.random() * 3;
+      subcategory = `${wasteType}_${disposalMethod}`;
     }
 
-    const handleResize = () => updateWidth();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    items.push({
+      calcId: `mock-${i}`,
+      category,
+      subcategory,
+      input,
+      kgCO2e,
+      createdAt: date.toISOString(),
+    });
+  }
 
-  return (
-    <div ref={containerRef} style={{ width: '100%', height }}>
-      {width > 0 && children(width)}
-    </div>
-  );
+  return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export default function AnalyticsPage() {
@@ -107,6 +247,9 @@ export default function AnalyticsPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [categoriesKey, setCategoriesKey] = useState(0); // Key para forzar actualización
+
+  // NUEVO: Estado para almacenar datos raw del historial para filtrado granular
+  const [rawHistoryData, setRawHistoryData] = useState<CalcHistoryItem[]>([]);
 
   // Helper para obtener estadísticas de una categoría
   const getCategoryStats = useCallback(
@@ -136,9 +279,60 @@ export default function AnalyticsPage() {
   const categoriesLoadedRef = useRef(false);
   const isInitialLoadRef = useRef(true);
 
+  // ===========================================================================
+  // NUEVA FUNCIÓN: Cargar datos RAW del historial para filtrado granular
+  // ===========================================================================
+
+  /**
+   * Carga TODOS los datos del historial (sin paginación) para permitir
+   * filtrado granular por subcategorías en el frontend
+   */
+  const loadRawHistoryData = useCallback(async () => {
+    console.log('📚 [loadRawHistoryData] === INICIO ===');
+    try {
+      if (USE_MOCK_DATA) {
+        // 🎭 MOCK DATA
+        console.log('📚 [loadRawHistoryData] Usando MOCK DATA...');
+        const items = generateMockRawHistoryData();
+        setRawHistoryData(items);
+        console.log('📚 [loadRawHistoryData] Mock data loaded:', items.length, 'items');
+        return;
+      }
+
+      // Cargar todos los datos con un pageSize grande
+      // NOTA: En producción, esto debería hacerse con carga incremental
+      const params = new URLSearchParams();
+      params.append('pageSize', '10000'); // Cargar hasta 10k registros
+      params.append('page', '0');
+
+      const url = `/calc/history?${params.toString()}`;
+      console.log('📚 [loadRawHistoryData] Llamando API:', url);
+
+      const data = await api<CalcHistoryResponse>(url);
+      console.log('📚 [loadRawHistoryData] === RESPUESTA ===');
+      console.log('📚 [loadRawHistoryData] Total items:', data?.items?.length || 0);
+
+      if (data && data.items) {
+        setRawHistoryData(data.items);
+        console.log('📚 [loadRawHistoryData] Datos raw almacenados');
+      } else {
+        setRawHistoryData([]);
+      }
+    } catch (error: any) {
+      console.error('🔴 [loadRawHistoryData] Error:', error?.message);
+      setRawHistoryData([]);
+    }
+    console.log('📚 [loadRawHistoryData] === FIN ===');
+  }, []);
+
   // Funciones de carga de datos
   const loadAvailableCareers = useCallback(async () => {
     try {
+      if (USE_MOCK_DATA) {
+        // 🎭 MOCK DATA
+        setAvailableCareers(['Ingeniería de Sistemas', 'Ingeniería Ambiental', 'Administración', 'Economía']);
+        return;
+      }
       const careers = await api<string[]>('/stats/available-careers');
       setAvailableCareers(careers || []);
     } catch (error) {
@@ -148,13 +342,47 @@ export default function AnalyticsPage() {
 
   const loadAvailableCategories = useCallback(async (forceReload = false) => {
     console.log('🔵 [loadAvailableCategories] === INICIO ===', { forceReload, alreadyLoaded: categoriesLoadedRef.current });
-    
+
     if (categoriesLoadedRef.current && !forceReload) {
       console.log('🔵 [loadAvailableCategories] Ya cargado, saltando...');
       return;
     }
-    
+
     try {
+      if (USE_MOCK_DATA) {
+        // 🎭 MOCK DATA
+        console.log('🔵 [loadAvailableCategories] Usando MOCK DATA...');
+        const categories = generateMockAvailableCategories();
+        console.log('🔵 [loadAvailableCategories] Mock categories:', categories);
+
+        setAvailableCategories(categories);
+        categoriesLoadedRef.current = true;
+
+        // Select all categories by default
+        const allCategories = new Set<string>();
+        const allExpanded = new Set<string>();
+
+        Object.keys(categories).forEach(cat => {
+          if (cat) {
+            allCategories.add(cat);
+            allExpanded.add(cat);
+            const subcats = categories[cat];
+            if (Array.isArray(subcats) && subcats.length > 0) {
+              subcats.forEach((subcat) => {
+                if (subcat) {
+                  allCategories.add(`${cat}_${subcat}`);
+                }
+              });
+            }
+          }
+        });
+
+        setSelectedCategories(allCategories);
+        setExpandedCategories(allExpanded);
+        console.log('🔵 [loadAvailableCategories] Mock data loaded successfully');
+        return;
+      }
+
       console.log('🔵 [loadAvailableCategories] Llamando API /stats/available-categories...');
       const categories = await api<Record<string, string[]>>('/stats/available-categories');
       console.log('🔵 [loadAvailableCategories] === RESPUESTA DE API ===');
@@ -231,76 +459,97 @@ export default function AnalyticsPage() {
 
   // Ref para mantener referencia a selectedCategories
   const selectedCategoriesRef = useRef<Set<string>>(new Set());
-  
+
   // Sincronizar ref con state
   useEffect(() => {
     selectedCategoriesRef.current = selectedCategories;
   }, [selectedCategories]);
 
+  /**
+   * Extrae solo las categorías principales de un conjunto de categorías/subcategorías
+   * Ejemplo: ['transporte', 'transporte_car', 'electricidad_laptop'] → ['transporte', 'electricidad']
+   */
+  const extractMainCategories = useCallback((categories: Set<string>): string[] => {
+    const mainCategories = new Set<string>();
+    categories.forEach((cat) => {
+      // Si contiene guion bajo, es una subcategoría
+      if (cat.includes('_')) {
+        const mainCat = cat.split('_')[0];
+        mainCategories.add(mainCat);
+      } else {
+        // Es una categoría principal
+        mainCategories.add(cat);
+      }
+    });
+    return Array.from(mainCategories);
+  }, []);
+
   const loadCategoryData = useCallback(async (skipLoadingState = false, categoriesOverride?: Set<string>) => {
     console.log('📈 [loadCategoryData] === INICIO ===', { skipLoadingState, hasOverride: !!categoriesOverride });
     try {
       if (!skipLoadingState) {
-        setLoadingData(true); // Activar indicador de carga solo si no se omite
+        setLoadingData(true);
       }
-      
+
+      if (USE_MOCK_DATA) {
+        // 🎭 MOCK DATA
+        console.log('📈 [loadCategoryData] Usando MOCK DATA...');
+        const data = generateMockCategoryData();
+        setCategoryData(data);
+        console.log('📈 [loadCategoryData] Mock data loaded:', data);
+        if (!skipLoadingState) {
+          setLoadingData(false);
+        }
+        return;
+      }
+
       // Usar categorías pasadas como parámetro o el ref como fallback
       const currentSelected = categoriesOverride || selectedCategoriesRef.current;
-      const categoriesArray = currentSelected ? Array.from(currentSelected) : [];
-      console.log('📈 [loadCategoryData] Categorías seleccionadas:', categoriesArray);
-      console.log('📈 [loadCategoryData] Total categorías:', categoriesArray.length);
-      
-      // Construir URL con parámetros de categorías
-      // Si no hay categorías seleccionadas, no enviar el parámetro para cargar todas
+
+      // CAMBIO CLAVE: Extraer solo categorías principales para enviar al backend
+      const mainCategories = extractMainCategories(currentSelected);
+      console.log('📈 [loadCategoryData] Categorías principales extraídas:', mainCategories);
+      console.log('📈 [loadCategoryData] Categorías seleccionadas (incluye subcategorías):', Array.from(currentSelected));
+
+      // Construir URL con solo categorías principales
       let url = '/stats/by-category';
-      if (categoriesArray.length > 0) {
+      if (mainCategories.length > 0) {
         const params = new URLSearchParams();
-        categoriesArray.forEach(cat => {
+        mainCategories.forEach(cat => {
           if (cat && cat.trim()) {
             params.append('categories', cat.trim());
           }
         });
         if (params.toString()) {
           url += '?' + params.toString();
-          console.log('📈 [loadCategoryData] URL con parámetros:', url);
-        } else {
-          console.log('📈 [loadCategoryData] No hay categorías válidas, cargando todas');
+          console.log('📈 [loadCategoryData] URL con parámetros (solo principales):', url);
         }
       } else {
-        console.log('📈 [loadCategoryData] No hay categorías seleccionadas, cargando todas (sin filtros)');
+        console.log('📈 [loadCategoryData] No hay categorías seleccionadas, cargando todas');
       }
-      
+
       console.log('📈 [loadCategoryData] Llamando API:', url);
       const data = await api<StatsByCategoryResponse>(url);
-      console.log('📈 [loadCategoryData] === RESPUESTA ===');
-      console.log('📈 [loadCategoryData] Datos recibidos:', data);
+      console.log('📈 [loadCategoryData] === RESPUESTA DEL BACKEND ===');
       console.log('📈 [loadCategoryData] Total categorías en respuesta:', data?.categories?.length || 0);
-      console.log('📈 [loadCategoryData] Total kg CO2e:', data?.totalKgCO2e || 0);
-      
+
       if (data) {
         setCategoryData(data);
-        console.log('📈 [loadCategoryData] Datos establecidos en estado exitosamente');
+        console.log('📈 [loadCategoryData] Datos establecidos en estado');
       } else {
-        console.warn('📈 [loadCategoryData] No hay datos, estableciendo estructura vacía');
-        // Establecer estructura vacía si no hay datos
         setCategoryData({ categories: [], totalKgCO2e: 0 });
       }
       console.log('📈 [loadCategoryData] === FIN EXITOSO ===');
     } catch (error: any) {
       console.error('🔴 [loadCategoryData] === ERROR ===');
-      console.error('🔴 [loadCategoryData] Error cargando datos por categoría:', error);
-      console.error('🔴 [loadCategoryData] Mensaje:', error?.message);
-      console.error('🔴 [loadCategoryData] Stack:', error?.stack);
-      // En caso de error, establecer estructura vacía
+      console.error('🔴 [loadCategoryData] Error:', error?.message);
       setCategoryData({ categories: [], totalKgCO2e: 0 });
-      console.log('🔴 [loadCategoryData] Estructura vacía establecida debido al error');
     } finally {
       if (!skipLoadingState) {
-        setLoadingData(false); // Desactivar indicador de carga solo si no se omite
-        console.log('📈 [loadCategoryData] LoadingData establecido a false');
+        setLoadingData(false);
       }
     }
-  }, []);
+  }, [extractMainCategories]);
 
   const loadTimeSeriesData = useCallback(async (skipLoadingState = false, categoriesOverride?: Set<string>) => {
     console.log('📊 [loadTimeSeriesData] === INICIO ===', { skipLoadingState, hasOverride: !!categoriesOverride });
@@ -308,6 +557,19 @@ export default function AnalyticsPage() {
       if (!skipLoadingState) {
         setLoadingData(true);
       }
+
+      if (USE_MOCK_DATA) {
+        // 🎭 MOCK DATA
+        console.log('📊 [loadTimeSeriesData] Usando MOCK DATA...');
+        const data = generateMockTimeSeriesData(groupBy, months);
+        setTimeSeriesData(data);
+        console.log('📊 [loadTimeSeriesData] Mock data loaded:', data.data.length, 'points');
+        if (!skipLoadingState) {
+          setLoadingData(false);
+        }
+        return;
+      }
+
       const params = new URLSearchParams();
       params.append('groupBy', groupBy);
       params.append('months', months.toString());
@@ -315,57 +577,49 @@ export default function AnalyticsPage() {
       if (career) params.append('career', career);
       if (month) params.append('month', month.toString());
       if (day) params.append('day', day.toString());
-      
+
       // Usar categorías pasadas como parámetro o el ref como fallback
       const currentSelected = categoriesOverride || selectedCategoriesRef.current;
-      const categoriesArray = currentSelected ? Array.from(currentSelected) : [];
-      console.log('📊 [loadTimeSeriesData] Categorías seleccionadas:', categoriesArray);
-      console.log('📊 [loadTimeSeriesData] Total categorías:', categoriesArray.length);
-      
-      if (categoriesArray.length > 0) {
-        categoriesArray.forEach(cat => {
+
+      // CAMBIO CLAVE: Extraer solo categorías principales para enviar al backend
+      const mainCategories = extractMainCategories(currentSelected);
+      console.log('📊 [loadTimeSeriesData] Categorías principales extraídas:', mainCategories);
+      console.log('📊 [loadTimeSeriesData] Categorías seleccionadas (incluye subcategorías):', Array.from(currentSelected));
+
+      if (mainCategories.length > 0) {
+        mainCategories.forEach(cat => {
           if (cat && cat.trim()) {
             params.append('categories', cat.trim());
           }
         });
-        console.log('📊 [loadTimeSeriesData] Categorías agregadas a params:', categoriesArray.filter(c => c && c.trim()));
+        console.log('📊 [loadTimeSeriesData] Categorías principales agregadas a params:', mainCategories);
       } else {
-        console.log('📊 [loadTimeSeriesData] No hay categorías seleccionadas, cargando todas (sin filtros)');
+        console.log('📊 [loadTimeSeriesData] No hay categorías seleccionadas, cargando todas');
       }
-      
+
       const url = `/stats/time-series?${params.toString()}`;
       console.log('📊 [loadTimeSeriesData] Llamando API:', url);
       const data = await api<TimeSeriesResponse>(url);
-      console.log('📊 [loadTimeSeriesData] === RESPUESTA ===');
-      console.log('📊 [loadTimeSeriesData] Datos recibidos:', data);
+      console.log('📊 [loadTimeSeriesData] === RESPUESTA DEL BACKEND ===');
       console.log('📊 [loadTimeSeriesData] Total puntos de datos:', data?.data?.length || 0);
-      console.log('📊 [loadTimeSeriesData] Total kg CO2e:', data?.totalKgCO2e || 0);
-      
-      // Asegurarse de que data sea válido
+
       if (data) {
         setTimeSeriesData(data);
-        console.log('📊 [loadTimeSeriesData] Datos establecidos en estado exitosamente');
+        console.log('📊 [loadTimeSeriesData] Datos establecidos en estado');
       } else {
-        console.warn('📊 [loadTimeSeriesData] No hay datos, estableciendo estructura vacía');
-        // Si no hay datos, establecer estructura vacía
         setTimeSeriesData({ data: [], groupBy, totalKgCO2e: 0 });
       }
       console.log('📊 [loadTimeSeriesData] === FIN EXITOSO ===');
     } catch (error: any) {
       console.error('🔴 [loadTimeSeriesData] === ERROR ===');
-      console.error('🔴 [loadTimeSeriesData] Error cargando datos temporales:', error);
-      console.error('🔴 [loadTimeSeriesData] Mensaje:', error?.message);
-      console.error('🔴 [loadTimeSeriesData] Stack:', error?.stack);
-      // En caso de error, establecer estructura vacía para que la UI no se quede bloqueada
+      console.error('🔴 [loadTimeSeriesData] Error:', error?.message);
       setTimeSeriesData({ data: [], groupBy, totalKgCO2e: 0 });
-      console.log('🔴 [loadTimeSeriesData] Estructura vacía establecida debido al error');
     } finally {
       if (!skipLoadingState) {
         setLoadingData(false);
-        console.log('📊 [loadTimeSeriesData] LoadingData establecido a false');
       }
     }
-  }, [groupBy, months, schedule, career, month, day]);
+  }, [groupBy, months, schedule, career, month, day, extractMainCategories]);
   
   // Usar un efecto separado para selectedCategories con debounce
   // Este efecto se ejecuta cuando cambian las categorías seleccionadas
@@ -430,6 +684,15 @@ export default function AnalyticsPage() {
   const loadSummary = useCallback(async () => {
     console.log('📋 [loadSummary] === INICIO ===');
     try {
+      if (USE_MOCK_DATA) {
+        // 🎭 MOCK DATA
+        console.log('📋 [loadSummary] Usando MOCK DATA...');
+        const data = generateMockSummary();
+        setSummary(data);
+        console.log('📋 [loadSummary] Mock data loaded:', data);
+        return;
+      }
+
       console.log('📋 [loadSummary] Llamando API /stats/summary...');
       const data = await api<StatsSummary>('/stats/summary');
       console.log('📋 [loadSummary] === RESPUESTA ===');
@@ -485,15 +748,17 @@ export default function AnalyticsPage() {
         console.error('🔴 [loadAllData] Error en loadSummary:', err);
         return null;
       }),
+      // NUEVO: Cargar datos raw para filtrado granular
+      loadRawHistoryData().catch(err => {
+        console.error('🔴 [loadAllData] Error en loadRawHistoryData:', err);
+        return null;
+      }),
     ];
-    
+
     console.log('🚀 [loadAllData] Esperando a que se carguen los datos iniciales...');
-    // Esperar a que se carguen las categorías antes de cargar time series
     await Promise.all(loadPromises);
     console.log('🚀 [loadAllData] Datos iniciales cargados, esperando 100ms antes de cargar time series...');
-    
-    // Cargar time series después de que las categorías estén disponibles
-    // Esto asegura que selectedCategoriesRef esté actualizado
+
     setTimeout(() => {
       console.log('🚀 [loadAllData] Cargando time series...');
       loadTimeSeriesData().catch(err => {
@@ -501,31 +766,25 @@ export default function AnalyticsPage() {
       });
     }, 100);
     console.log('🚀 [loadAllData] === FIN ===');
-  }, [loadAvailableCareers, loadAvailableCategories, loadTimeSeriesData, loadCategoryData, loadSummary]);
+  }, [loadAvailableCareers, loadAvailableCategories, loadTimeSeriesData, loadCategoryData, loadSummary, loadRawHistoryData]);
 
   // Efectos
   useEffect(() => {
-    console.log('⚡ [useEffect inicial] === INICIO ===');
-    console.log('⚡ [useEffect inicial] auth0Loading:', auth0Loading);
-    console.log('⚡ [useEffect inicial] auth0User:', auth0User ? 'presente' : 'ausente');
-    console.log('⚡ [useEffect inicial] authToken:', localStorage.getItem('authToken') ? 'presente' : 'ausente');
-    
+    // ========================================================================
+    // SOLUCIÓN EXPERTA: NO VALIDAR AUTH EN FRONTEND
+    // ========================================================================
+    // Esperar a que Auth0 termine de cargar, luego cargar datos directamente.
+    // Si el backend responde 401, el interceptor redirigirá automáticamente.
+
     if (auth0Loading) {
-      console.log('⚡ [useEffect inicial] Auth0 aún cargando, esperando...');
-      return;
+      return; // Esperar a que Auth0 termine
     }
 
-    if (!auth0User && !localStorage.getItem('authToken')) {
-      console.log('⚡ [useEffect inicial] No hay usuario autenticado, redirigiendo a login...');
-      router.push('/login');
-      return;
-    }
-
-    console.log('⚡ [useEffect inicial] Usuario autenticado, iniciando carga de datos...');
+    // Cargar datos independientemente del estado de autenticación
+    // El backend manejará la autenticación y el interceptor manejará los 401
     setLoading(false);
     loadAllData();
-    console.log('⚡ [useEffect inicial] === FIN ===');
-  }, [router, auth0User, auth0Loading, loadAllData]);
+  }, [auth0Loading, loadAllData]);
 
   // Cargar categorías solo una vez
   useEffect(() => {
@@ -611,7 +870,8 @@ export default function AnalyticsPage() {
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('username');
       localStorage.removeItem('userId');
-      router.push('/login');
+      // Usar window.location.href para evitar problemas con RSC
+      window.location.href = '/login';
     }
   };
 
@@ -788,6 +1048,79 @@ export default function AnalyticsPage() {
     return applianceLabels[subcategory] || subcategory;
   }, []);
 
+  const getWasteLabel = useCallback((subcategory: string): string => {
+    if (!subcategory) return subcategory;
+
+    // Mapeo completo de subcategorías de residuos
+    const wasteLabels: Record<string, string> = {
+      // Orgánicos
+      'organic_mixed': '🌱 Orgánicos (Gestión Mixta)',
+      'organic_recycling': '🌱 Orgánicos (Reciclaje)',
+      'organic_composting': '🌱 Orgánicos (Compostaje)',
+      'organic_landfill': '🌱 Orgánicos (Relleno Sanitario)',
+      // Papel y Cartón
+      'paper_mixed': '📄 Papel y Cartón (Gestión Mixta)',
+      'paper_recycling': '📄 Papel y Cartón (Reciclaje)',
+      'paper_composting': '📄 Papel y Cartón (Compostaje)',
+      'paper_landfill': '📄 Papel y Cartón (Relleno Sanitario)',
+      // Plásticos
+      'plastic_mixed': '🥤 Plásticos (Gestión Mixta)',
+      'plastic_recycling': '🥤 Plásticos (Reciclaje)',
+      'plastic_composting': '🥤 Plásticos (Compostaje)',
+      'plastic_landfill': '🥤 Plásticos (Relleno Sanitario)',
+      // Vidrio
+      'glass_mixed': '🍾 Vidrio (Gestión Mixta)',
+      'glass_recycling': '🍾 Vidrio (Reciclaje)',
+      'glass_composting': '🍾 Vidrio (Compostaje)',
+      'glass_landfill': '🍾 Vidrio (Relleno Sanitario)',
+      // Metales
+      'metal_mixed': '🔩 Metales (Gestión Mixta)',
+      'metal_recycling': '🔩 Metales (Reciclaje)',
+      'metal_composting': '🔩 Metales (Compostaje)',
+      'metal_landfill': '🔩 Metales (Relleno Sanitario)',
+      // Otros residuos
+      'other_mixed': '🗑️ Otros Residuos (Gestión Mixta)',
+      'other_recycling': '🗑️ Otros Residuos (Reciclaje)',
+      'other_composting': '🗑️ Otros Residuos (Compostaje)',
+      'other_landfill': '🗑️ Otros Residuos (Relleno Sanitario)',
+    };
+
+    // Si existe una etiqueta directa, usarla
+    if (wasteLabels[subcategory]) {
+      return wasteLabels[subcategory];
+    }
+
+    // Si no, intentar parsear wasteType_disposalMethod
+    const parts = subcategory.split('_');
+    if (parts.length >= 2) {
+      const wasteType = parts[0];
+      const disposalMethod = parts.slice(1).join('_'); // Por si hay múltiples guiones bajos
+
+      const wasteTypeLabels: Record<string, string> = {
+        organic: '🌱 Orgánicos',
+        paper: '📄 Papel y Cartón',
+        plastic: '🥤 Plásticos',
+        glass: '🍾 Vidrio',
+        metal: '🔩 Metales',
+        other: '🗑️ Otros Residuos',
+      };
+
+      const disposalLabels: Record<string, string> = {
+        mixed: 'Gestión Mixta',
+        recycling: 'Reciclaje',
+        composting: 'Compostaje',
+        landfill: 'Relleno Sanitario',
+      };
+
+      const typeLabel = wasteTypeLabels[wasteType] || wasteType;
+      const methodLabel = disposalMethod ? ` (${disposalLabels[disposalMethod] || disposalMethod})` : '';
+      return `${typeLabel}${methodLabel}`;
+    }
+
+    // Fallback final
+    return subcategory;
+  }, []);
+
   const toNumberOrDefault = useCallback((value: unknown, fallback = 0): number => {
     if (typeof value === 'number') {
       return Number.isFinite(value) ? value : fallback;
@@ -796,7 +1129,202 @@ export default function AnalyticsPage() {
     return Number.isFinite(parsed) ? parsed : fallback;
   }, []);
 
-  // Memoizar datos de gráficos para optimizar renderizado y agregar logs
+  // ============================================================================
+  // FUNCIONES HELPER PARA EXTRAER SUBCATEGORÍAS DE DATOS DEL BACKEND
+  // ============================================================================
+
+  /**
+   * Extrae la subcategoría de transporte desde input_json
+   * Formato: {transportMode}_{fuelType} o solo {transportMode}
+   * Ejemplos: car_gasoline, bus, bicycle_electric
+   */
+  const extractTransportSubcategory = useCallback((input: any): string => {
+    if (!input) return '';
+    const mode = input.transportMode || '';
+    const fuel = input.fuelType || '';
+    // Si tiene fuelType, combinar mode_fuel, si no solo mode
+    return fuel ? `${mode}_${fuel}` : mode;
+  }, []);
+
+  /**
+   * Extrae subcategorías de electricidad desde input_json
+   * Retorna array de electrodomésticos seleccionados
+   * Ejemplo: ['laptop', 'monitor', 'desktop']
+   */
+  const extractElectricitySubcategories = useCallback((input: any): string[] => {
+    if (!input || !input.selectedAppliances) return [];
+    // selectedAppliances puede ser array o string JSON
+    if (Array.isArray(input.selectedAppliances)) {
+      return input.selectedAppliances.map((item: any) =>
+        typeof item === 'string' ? item : item.appliance || item.type || ''
+      ).filter(Boolean);
+    }
+    return [];
+  }, []);
+
+  /**
+   * Extrae subcategorías de residuos desde input_json
+   * Retorna array de combinaciones {wasteType}_{disposalMethod}
+   * Ejemplo: ['organic_composting', 'plastic_recycling']
+   */
+  const extractWasteSubcategories = useCallback((input: any): string[] => {
+    if (!input || !input.wasteItems) return [];
+    const disposalMethod = input.disposalMethod || 'mixed';
+
+    // wasteItems es un array de items con wasteType
+    if (Array.isArray(input.wasteItems)) {
+      return input.wasteItems.map((item: any) => {
+        const wasteType = item.wasteType || item.type || '';
+        return wasteType ? `${wasteType}_${disposalMethod}` : '';
+      }).filter(Boolean);
+    }
+    return [];
+  }, []);
+
+  /**
+   * Determina si un punto de datos debe incluirse según las subcategorías seleccionadas
+   *
+   * LÓGICA MEJORADA PARA ELECTRICIDAD:
+   * - Si NO hay subcategorías de electricidad seleccionadas → incluir si categoría principal está seleccionada
+   * - Si hay ALGUNAS subcategorías seleccionadas:
+   *   * MODO ESTRICTO: Solo incluir si TODOS los electrodomésticos del cálculo están seleccionados
+   *   * Esto evita duplicar emisiones cuando se deseleccionan algunos electrodomésticos
+   *
+   * @param category - Categoría del cálculo
+   * @param input - Input JSON del cálculo
+   * @param selectedSubcategories - Set de subcategorías seleccionadas
+   * @returns true si el dato debe incluirse
+   */
+  const shouldIncludeDataPoint = useCallback((
+    category: string,
+    input: any,
+    selectedSubcategories: Set<string>
+  ): boolean => {
+    // Si no hay filtros de subcategorías para esta categoría, incluir todo
+    const categoryPrefix = `${category}_`;
+    const hasSubcategoryFilters = Array.from(selectedSubcategories).some(
+      (key) => key.startsWith(categoryPrefix)
+    );
+
+    if (!hasSubcategoryFilters) {
+      // Si la categoría principal está seleccionada, incluir
+      return selectedSubcategories.has(category);
+    }
+
+    // Verificar subcategorías específicas
+    switch (category) {
+      case 'transporte': {
+        const subcategory = extractTransportSubcategory(input);
+        return !!subcategory && selectedSubcategories.has(`transporte_${subcategory}`);
+      }
+
+      case 'electricidad': {
+        const subcategories = extractElectricitySubcategories(input);
+
+        if (subcategories.length === 0) {
+          return false; // Sin electrodomésticos, excluir
+        }
+
+        // MODO ESTRICTO: Solo incluir si TODOS los electrodomésticos están seleccionados
+        // Esto evita contar parcialmente un cálculo que tiene múltiples electrodomésticos
+        const allSelected = subcategories.every((subcat) =>
+          selectedSubcategories.has(`electricidad_${subcat}`)
+        );
+
+        console.log(`🔍 [shouldIncludeDataPoint] Electricidad:`, {
+          subcategories,
+          allSelected,
+          selectedFilters: Array.from(selectedSubcategories).filter(s => s.startsWith('electricidad_'))
+        });
+
+        return allSelected;
+      }
+
+      case 'residuos': {
+        const subcategories = extractWasteSubcategories(input);
+        // Para residuos, incluir si al menos un tipo está seleccionado
+        // (un cálculo puede tener múltiples tipos de residuos)
+        return subcategories.some((subcat) =>
+          selectedSubcategories.has(`residuos_${subcat}`)
+        );
+      }
+
+      default:
+        // Para categorías sin subcategorías, verificar categoría principal
+        return selectedSubcategories.has(category);
+    }
+  }, [extractTransportSubcategory, extractElectricitySubcategories, extractWasteSubcategories]);
+
+  // ============================================================================
+  // FILTRADO Y AGREGACIÓN LOCAL DE DATOS RAW
+  // ============================================================================
+
+  /**
+   * Filtra datos raw según subcategorías seleccionadas
+   * Este es el corazón del filtrado granular
+   */
+  const filteredRawData = useMemo(() => {
+    console.log('🔍 [filteredRawData] === INICIO FILTRADO ===');
+    console.log('🔍 [filteredRawData] Total datos raw:', rawHistoryData.length);
+    console.log('🔍 [filteredRawData] Categorías seleccionadas:', Array.from(selectedCategories));
+
+    if (rawHistoryData.length === 0) {
+      console.log('🔍 [filteredRawData] No hay datos raw, retornando vacío');
+      return [];
+    }
+
+    if (selectedCategories.size === 0) {
+      console.log('🔍 [filteredRawData] No hay categorías seleccionadas, retornando todos los datos');
+      return rawHistoryData;
+    }
+
+    const filtered = rawHistoryData.filter(item => {
+      const shouldInclude = shouldIncludeDataPoint(item.category, item.input, selectedCategories);
+      return shouldInclude;
+    });
+
+    console.log('🔍 [filteredRawData] Datos filtrados:', filtered.length);
+    console.log('🔍 [filteredRawData] === FIN FILTRADO ===');
+    return filtered;
+  }, [rawHistoryData, selectedCategories, shouldIncludeDataPoint]);
+
+  /**
+   * Agregar datos filtrados por categoría para gráficos
+   */
+  const categoryStats = useMemo(() => {
+    console.log('📊 [categoryStats] === INICIO AGREGACIÓN ===');
+
+    // Agrupar por categoría
+    const grouped = new Map<string, { totalKgCO2e: number; recordCount: number }>();
+
+    filteredRawData.forEach(item => {
+      const existing = grouped.get(item.category) || { totalKgCO2e: 0, recordCount: 0 };
+      existing.totalKgCO2e += item.kgCO2e;
+      existing.recordCount += 1;
+      grouped.set(item.category, existing);
+    });
+
+    // Convertir a array
+    const stats = Array.from(grouped.entries()).map(([category, data]) => ({
+      category,
+      totalKgCO2e: data.totalKgCO2e,
+      recordCount: data.recordCount,
+      percentage: 0 // Se calculará después
+    }));
+
+    // Calcular porcentajes
+    const total = stats.reduce((sum, s) => sum + s.totalKgCO2e, 0);
+    stats.forEach(s => {
+      s.percentage = total > 0 ? (s.totalKgCO2e / total) * 100 : 0;
+    });
+
+    console.log('📊 [categoryStats] Total categorías:', stats.length);
+    console.log('📊 [categoryStats] Total kg CO2e:', total);
+    console.log('📊 [categoryStats] === FIN AGREGACIÓN ===');
+
+    return stats;
+  }, [filteredRawData]);
+
   const timeSeriesPoints = useMemo(() => {
     const points = timeSeriesData?.data ?? [];
     console.log('📊 [useMemo timeSeriesPoints] Datos actualizados:', {
@@ -807,22 +1335,13 @@ export default function AnalyticsPage() {
     return points;
   }, [timeSeriesData]);
   
-  const categoryStats = useMemo(() => {
-    const stats = categoryData?.categories ?? [];
-    console.log('📊 [useMemo categoryStats] Datos actualizados:', {
-      totalCategories: stats.length,
-      totalKgCO2e: categoryData?.totalKgCO2e || 0,
-      categories: stats.map(c => ({ name: c.category, total: c.totalKgCO2e, count: c.recordCount }))
-    });
-    return stats;
-  }, [categoryData]);
-  
   const pieChartData = useMemo(
     () => {
-      const total = categoryData?.totalKgCO2e || 0;
+      // Usar datos filtrados localmente en lugar de categoryData del backend
+      const total = categoryStats.reduce((sum, s) => sum + s.totalKgCO2e, 0);
       const data = categoryStats.map((entry, index) => {
         const value = toNumberOrDefault(entry.totalKgCO2e);
-        const percentage = total > 0 ? (value / toNumberOrDefault(total)) * 100 : 0;
+        const percentage = entry.percentage; // Ya calculado en categoryStats
         return {
           id: entry.category,
           label: getCategoryLabel(entry.category),
@@ -831,7 +1350,7 @@ export default function AnalyticsPage() {
           color: COLORS[index % COLORS.length],
         };
       });
-      console.log('📊 [useMemo pieChartData] Datos actualizados:', {
+      console.log('📊 [useMemo pieChartData] Datos actualizados (filtrados):', {
         totalItems: data.length,
         totalValue: total,
         calculatedTotal: data.reduce((sum, d) => sum + d.value, 0),
@@ -839,24 +1358,9 @@ export default function AnalyticsPage() {
       });
       return data;
     },
-    [categoryStats, categoryData, getCategoryLabel, toNumberOrDefault],
+    [categoryStats, getCategoryLabel, toNumberOrDefault],
   );
-
-  const kgValueFormatter = useCallback<ValueFormatter<number | string | null>>(
-    (value) => {
-      const numeric = toNumberOrDefault(value);
-      return `${numeric.toFixed(2)} kg CO₂e`;
-    },
-    [toNumberOrDefault],
-  );
-
-  const recordValueFormatter = useCallback<ValueFormatter<number | string | null>>(
-    (value) => {
-      const numeric = toNumberOrDefault(value);
-      return `${numeric.toFixed(0)} registros`;
-    },
-    [toNumberOrDefault],
-  );
+console.log("asdasdasdasdasd,",pieChartData )
 
   if (loading) {
     return (
@@ -870,21 +1374,21 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-to-br from-green-50 via-blue-50 to-green-50">
+    <div className="min-h-dvh bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
                 <span className="text-white text-xl font-bold">E</span>
               </div>
-              <h1 className="text-xl font-bold text-gray-800">EcoEstudiante</h1>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">EcoEstudiante</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="px-4 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-sm hover:shadow-md flex items-center gap-2 font-medium"
                 title={sidebarOpen ? 'Ocultar filtros' : 'Mostrar filtros'}
               >
                 <span className="text-lg">{sidebarOpen ? '◀' : '▶'}</span>
@@ -892,19 +1396,19 @@ export default function AnalyticsPage() {
               </button>
               <button
                 onClick={() => router.push('/dashboard')}
-                className="px-4 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all shadow-sm hover:shadow-md font-medium"
               >
                 Dashboard
               </button>
               <button
                 onClick={() => router.push('/history')}
-                className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm hover:shadow-md font-medium"
               >
                 Historial
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm hover:shadow-md font-medium"
               >
                 Cerrar Sesión
               </button>
@@ -916,264 +1420,50 @@ export default function AnalyticsPage() {
       {/* Main Content with Sidebar */}
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar */}
-        <aside
-          className={`${
-            sidebarOpen ? 'w-80' : 'w-0'
-          } bg-white border-r border-gray-200 shadow-lg transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0`}
-        >
-          <div className="h-full flex flex-col">
-            {/* Sidebar Header */}
-            <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                  <span>🌱</span> Filtros de Emisiones
-                </h3>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                  title="Ocultar sidebar"
-                >
-                  <span className="text-xl">←</span>
-                </button>
-              </div>
-              <div className="flex gap-2 mb-2">
-                <button
-                  onClick={selectAllCategories}
-                  className="flex-1 px-3 py-2 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
-                >
-                  ✓ Seleccionar Todas
-                </button>
-                <button
-                  onClick={deselectAllCategories}
-                  className="flex-1 px-3 py-2 text-xs font-medium bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors shadow-sm"
-                >
-                  ✗ Deseleccionar
-                </button>
-              </div>
-              <div className="mt-2">
-                <button
-                  onClick={() => {
-                    categoriesLoadedRef.current = false;
-                    loadAvailableCategories(true);
-                  }}
-                  className="w-full px-3 py-2 text-xs font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
-                  title="Recargar categorías desde el servidor"
-                >
-                  🔄 Recargar Categorías
-                </button>
-              </div>
-              {/* Mostrar resumen filtrado dinámicamente */}
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div className="flex justify-between">
-                    <span>Total Registros:</span>
-                    <span className="font-semibold text-gray-800">
-                      {categoryData 
-                        ? categoryData.categories.reduce((sum, cat) => sum + cat.recordCount, 0)
-                        : summary?.totalRecords || 0}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Huella Total:</span>
-                    <span className="font-semibold text-green-600">
-                      {categoryData 
-                        ? categoryData.totalKgCO2e.toFixed(2)
-                        : summary?.totalKgCO2e.toFixed(2) || '0.00'} kg CO₂e
-                    </span>
-                  </div>
-                  {selectedCategories.size > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <div className="text-xs text-gray-500">
-                        {selectedCategories.size} elemento{selectedCategories.size !== 1 ? 's' : ''} seleccionado{selectedCategories.size !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {Object.keys(availableCategories).length === 0 ? (
-                <div className="text-center text-gray-500 py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-                  <p className="text-sm">Cargando categorías...</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {Object.entries(availableCategories).map(([category, subcategories]) => {
-                    // Validar que subcategories sea un array
-                    const validSubcategories = Array.isArray(subcategories) ? subcategories : [];
-                    const hasSubcategories = validSubcategories.length > 0;
-                    
-                    // Log para debugging
-                    console.log(`🔵 [Render Category] ${category}:`, {
-                      subcategoriesType: typeof subcategories,
-                      isArray: Array.isArray(subcategories),
-                      validSubcategoriesCount: validSubcategories.length,
-                      validSubcategories: validSubcategories,
-                      hasSubcategories
-                    });
-                    
-                    return (
-                    <div
-                      key={category}
-                      className="border border-gray-200 rounded-lg overflow-hidden transition-all duration-200 hover:shadow-md"
-                    >
-                      {/* Category Header */}
-                      <div
-                        className="p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() => hasSubcategories && toggleCategoryExpansion(category)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={selectedCategories.has(category)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                toggleCategory(category);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 transition-all cursor-pointer"
-                            />
-                            <span className="text-lg">{getCategoryIcon(category)}</span>
-                            <span className="font-semibold text-gray-800">
-                              {getCategoryLabel(category)}
-                            </span>
-                            {hasSubcategories && (
-                              <span className="text-xs text-gray-500 ml-2">
-                                ({validSubcategories.length})
-                              </span>
-                            )}
-                          </div>
-                          {hasSubcategories && (
-                            <span
-                              className={`text-gray-500 transition-transform duration-200 ${
-                                expandedCategories.has(category) ? 'rotate-90' : ''
-                              }`}
-                            >
-                              ▶
-                            </span>
-                          )}
-                        </div>
-                        {(() => {
-                          const stats = getCategoryStats(category);
-                          return stats.recordCount > 0 ? (
-                            <div className="flex items-center gap-3 ml-6 text-xs">
-                              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                                {stats.recordCount} registro{stats.recordCount !== 1 ? 's' : ''}
-                              </span>
-                              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
-                                {stats.totalKgCO2e.toFixed(2)} kg CO₂e
-                              </span>
-                            </div>
-                          ) : null;
-                        })()}
-                      </div>
-
-                      {/* Subcategories */}
-                      {hasSubcategories && (
-                        <div
-                          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            expandedCategories.has(category)
-                              ? 'max-h-[600px] opacity-100'
-                              : 'max-h-0 opacity-0'
-                          }`}
-                        >
-                          <div className="p-2 space-y-1 bg-white max-h-[600px] overflow-y-auto">
-                            {validSubcategories.map((subcat, index) => {
-                              if (!subcat) return null; // Saltar subcategorías nulas
-                              const fullKey = `${category}_${subcat}`;
-                              const isSelected = selectedCategories.has(fullKey);
-                              console.log(`🔵 [Render Subcategory] ${index + 1}/${validSubcategories.length}: ${fullKey}`, { isSelected });
-                              return (
-                                <label
-                                  key={fullKey}
-                                  className={`flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-all group ${
-                                    isSelected
-                                      ? 'bg-green-50 border border-green-200'
-                                      : 'hover:bg-gray-50 border border-transparent'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleCategory(fullKey)}
-                                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 transition-all group-hover:scale-110 cursor-pointer"
-                                  />
-                                  <span className="text-sm text-gray-700 flex-1 font-medium">
-                                    {category === 'transporte'
-                                      ? getTransportLabel(subcat)
-                                      : category === 'electricidad'
-                                      ? getElectricityLabel(subcat)
-                                      : subcat}
-                                  </span>
-                                  {isSelected && (
-                                    <span className="text-green-500 text-sm font-bold">✓</span>
-                                  )}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Sidebar Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-green-50 to-blue-50">
-              <div className="text-center space-y-2">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-sm font-semibold text-gray-700">
-                    {selectedCategories.size}
-                  </span>
-                  <span className="text-xs text-gray-600">
-                    elemento{selectedCategories.size !== 1 ? 's' : ''} seleccionado
-                    {selectedCategories.size !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                {selectedCategories.size > 0 && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        const allExpanded = new Set(Object.keys(availableCategories));
-                        setExpandedCategories(allExpanded);
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                    >
-                      Expandir todas
-                    </button>
-                    <span className="text-gray-300 mx-2">|</span>
-                    <button
-                      onClick={() => setExpandedCategories(new Set())}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                    >
-                      Colapsar todas
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </aside>
+        <CategorySidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          availableCategories={availableCategories}
+          selectedCategories={selectedCategories}
+          expandedCategories={expandedCategories}
+          categoryData={categoryData}
+          summary={summary}
+          onSelectAll={selectAllCategories}
+          onDeselectAll={deselectAllCategories}
+          onReload={() => {
+            categoriesLoadedRef.current = false;
+            loadAvailableCategories(true);
+          }}
+          onToggleCategory={toggleCategory}
+          onToggleExpansion={toggleCategoryExpansion}
+          onExpandAll={() => {
+            const allExpanded = new Set(Object.keys(availableCategories));
+            setExpandedCategories(allExpanded);
+          }}
+          onCollapseAll={() => setExpandedCategories(new Set())}
+          getCategoryIcon={getCategoryIcon}
+          getCategoryLabel={getCategoryLabel}
+          getCategoryStats={getCategoryStats}
+          getSubcategoryLabel={(category: string, subcategory: string) => {
+            if (category === 'transporte') return getTransportLabel(subcategory);
+            if (category === 'electricidad') return getElectricityLabel(subcategory);
+            if (category === 'residuos') return getWasteLabel(subcategory);
+            return subcategory;
+          }}
+        />
 
         {/* Toggle Button when sidebar is closed */}
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed left-0 top-1/2 transform -translate-y-1/2 bg-green-500 text-white px-4 py-3 rounded-r-xl shadow-xl hover:bg-green-600 transition-all z-20 flex items-center gap-2 group"
+            className="fixed left-0 top-1/2 transform -translate-y-1/2 bg-emerald-600 text-white px-4 py-3 rounded-r-xl shadow-2xl hover:bg-emerald-700 transition-all z-20 flex items-center gap-2 group"
             title="Mostrar filtros de emisiones"
           >
             <span className="text-xl font-bold">→</span>
             <span className="text-sm font-medium hidden sm:inline whitespace-nowrap">
               Filtros
             </span>
-            <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
           </button>
         )}
 
@@ -1181,485 +1471,120 @@ export default function AnalyticsPage() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Title */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">
-            📊 Análisis de Huella de Carbono
+        <div className="mb-8 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+            📊 Análisis de Huella de Carbono Hola
           </h2>
-          <p className="text-gray-600">
-            Visualiza y analiza tus registros de huella de carbono con gráficos dinámicos
+          <p className="text-gray-700 font-medium">
+            Visualiza y analiza tus registros de huella de carbono con gráficos dinámicos e interactivos
           </p>
         </div>
 
         {/* Summary Cards */}
-        {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transform transition-all hover:scale-105">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Registros</p>
-                  <p className="text-2xl font-bold text-gray-800">{summary.totalRecords}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">📊</span>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transform transition-all hover:scale-105">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Huella Total</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {summary.totalKgCO2e.toFixed(2)} kg CO₂e
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">🌱</span>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transform transition-all hover:scale-105">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Este Mes</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {summary.thisMonthKgCO2e.toFixed(2)} kg CO₂e
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">📅</span>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transform transition-all hover:scale-105">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Promedio Mensual</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {summary.averagePerMonth.toFixed(2)} kg CO₂e
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">📈</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <SummaryCards summary={summary} loading={loading} />
 
-        {/* Controls */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">🔍 Filtros de Análisis</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agrupar por:
-              </label>
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value as 'month' | 'day')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="month">Mes</option>
-                <option value="day">Día</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Período (meses):
-              </label>
-              <select
-                value={months}
-                onChange={(e) => setMonths(Number(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="3">Últimos 3 meses</option>
-                <option value="6">Últimos 6 meses</option>
-                <option value="12">Últimos 12 meses</option>
-                <option value="24">Últimos 24 meses</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Jornada:
-              </label>
-              <select
-                value={schedule}
-                onChange={(e) => setSchedule(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Todas</option>
-                <option value="diurna">Diurna</option>
-                <option value="vespertina">Vespertina</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Carrera:
-              </label>
-              <select
-                value={career}
-                onChange={(e) => setCareer(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Todas</option>
-                {availableCareers.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mes del Año:
-              </label>
-              <select
-                value={month}
-                onChange={(e) => setMonth(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Todos los meses</option>
-                <option value="1">Enero</option>
-                <option value="2">Febrero</option>
-                <option value="3">Marzo</option>
-                <option value="4">Abril</option>
-                <option value="5">Mayo</option>
-                <option value="6">Junio</option>
-                <option value="7">Julio</option>
-                <option value="8">Agosto</option>
-                <option value="9">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Día del Mes:
-              </label>
-              <select
-                value={day}
-                onChange={(e) => setDay(e.target.value ? Number(e.target.value) : '')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Todos los días</option>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Día {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={loadAllData}
-              disabled={loadingData}
-              className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loadingData ? 'Cargando...' : '🔄 Actualizar'}
-            </button>
-            <button
-              onClick={() => {
-                setSchedule('');
-                setCareer('');
-                setMonth('');
-                setDay('');
-                setMonths(12);
-                setGroupBy('month');
-              }}
-              className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              🗑️ Limpiar Filtros
-            </button>
-          </div>
-        </div>
+        {/* Filters Panel */}
+        <FiltersPanel
+          groupBy={groupBy}
+          onGroupByChange={setGroupBy}
+          months={months}
+          onMonthsChange={setMonths}
+          schedule={schedule}
+          onScheduleChange={setSchedule}
+          career={career}
+          onCareerChange={setCareer}
+          availableCareers={availableCareers}
+          month={month}
+          onMonthChange={setMonth}
+          day={day}
+          onDayChange={setDay}
+          onUpdate={loadAllData}
+          onClear={() => {
+            setSchedule('');
+            setCareer('');
+            setMonth('');
+            setDay('');
+            setMonths(12);
+            setGroupBy('month');
+          }}
+          loading={loadingData}
+        />
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Time Series Line Chart */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              📈 Evolución Temporal de Emisiones
-            </h3>
-            {loadingData ? (
-              <div className="h-64 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-              </div>
-            ) : timeSeriesPoints.length > 0 ? (
-              <ResponsiveChart height={320}>
-                {(width) => (
-                  <LineChart
-                    width={width}
-                    height={320}
-                    xAxis={[
-                      {
-                        id: 'period',
-                        data: timeSeriesPoints.map((point) => point.period),
-                        scaleType: 'band',
-                        tickLabelStyle: {
-                          angle: -45,
-                          textAnchor: 'end',
-                          fontSize: 12,
-                          fill: '#6b7280',
-                        },
-                      },
-                    ]}
-                    yAxis={[
-                      {
-                        id: 'kg',
-                        tickLabelStyle: { fontSize: 12, fill: '#6b7280' },
-                      },
-                    ]}
-                    series={[
-                      {
-                        id: 'emisiones',
-                        data: timeSeriesPoints.map((point) => toNumberOrDefault(point.totalKgCO2e)),
-                        label: 'Emisiones (kg CO₂e)',
-                        area: true,
-                        curve: 'monotoneX',
-                        color: '#10b981',
-                        valueFormatter: kgValueFormatter,
-                      },
-                    ]}
-                    margin={{ top: 20, right: 20, left: 10, bottom: 60 }}
-                    grid={{ horizontal: true, vertical: false }}
-                    slotProps={{
-                      tooltip: {
-                        trigger: 'item',
-                      },
-                    }}
-                  />
-                )}
-              </ResponsiveChart>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                No hay datos disponibles para el período seleccionado
-              </div>
-            )}
-          </div>
+          {/* Time Series Line Chart - ECharts Professional */}
+          <TimeSeriesLineChart
+            data={timeSeriesPoints.map(point => ({
+              period: point.period,
+              emissions: toNumberOrDefault(point.totalKgCO2e),
+              records: point.recordCount,
+            }))}
+            title="Evolución Temporal de Emisiones"
+            loading={loadingData}
+            height={400}
+            showExport={true}
+            color="#10b981"
+          />
 
-          {/* Category Pie Chart */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              🥧 Distribución por Categoría
-            </h3>
-            {pieChartData.length > 0 ? (
-              <ResponsiveChart height={320}>
-                {(width) => (
-                  <PieChart
-                    width={width}
-                    height={320}
-                    series={[
-                      {
-                        data: pieChartData,
-                        innerRadius: 40,
-                        outerRadius: 120,
-                        paddingAngle: 2,
-                        cornerRadius: 4,
-                        valueFormatter: (value) => {
-                          const numValue = typeof value === 'number' ? value : typeof value === 'string' ? parseFloat(value) : 0;
-                          return kgValueFormatter(numValue);
-                        },
-                        arcLabel: (item) => {
-                          const dataItem = pieChartData.find((d) => d.id === item.id || d.value === item.value);
-                          const percentage = dataItem?.percentage ?? 0;
-                          return `${percentage.toFixed(1)}%`;
-                        },
-                        arcLabelMinAngle: 10,
-                      },
-                    ]}
-                    slotProps={{
-                      legend: {
-                        position: { vertical: 'bottom', horizontal: 'center' },
-                      },
-                      tooltip: {
-                        trigger: 'item',
-                      },
-                    }}
-                  />
-                )}
-              </ResponsiveChart>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                No hay datos por categoría disponibles
-              </div>
-            )}
-          </div>
+          {/* Category Pie Chart - ECharts Professional */}
+          <CategoryPieChart
+            data={pieChartData.map(item => ({
+              name: item.label,
+              value: item.value,
+              records: categoryStats.find(s => s.category === item.id)?.recordCount || 0,
+            }))}
+            title="Distribución por Categoría"
+            loading={loadingData}
+            height={450}
+            showExport={true}
+          />
         </div>
 
-        {/* Bar Charts Row */}
+        {/* Bar Charts Row - ECharts Professional */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Category Bar Chart */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              📊 Emisiones por Categoría
-            </h3>
-            {categoryStats.length > 0 ? (
-              <ResponsiveChart height={320}>
-                {(width) => (
-                  <BarChart
-                    width={width}
-                    height={320}
-                    xAxis={[
-                      {
-                        id: 'categories',
-                        data: categoryStats.map((entry) => entry.category),
-                        valueFormatter: (category: string) => getCategoryLabel(category),
-                        scaleType: 'band',
-                        tickLabelStyle: {
-                          angle: -45,
-                          textAnchor: 'end',
-                          fontSize: 12,
-                          fill: '#6b7280',
-                        },
-                      },
-                    ]}
-                    yAxis={[
-                      {
-                        id: 'kg',
-                        tickLabelStyle: { fontSize: 12, fill: '#6b7280' },
-                      },
-                    ]}
-                    series={[
-                      {
-                        id: 'emisiones',
-                        data: categoryStats.map((entry) => toNumberOrDefault(entry.totalKgCO2e)),
-                        label: 'Kg CO₂e',
-                        color: '#10b981',
-                        valueFormatter: kgValueFormatter,
-                      },
-                    ]}
-                    margin={{ top: 20, right: 20, left: 10, bottom: 70 }}
-                    grid={{ horizontal: true }}
-                    slotProps={{
-                      tooltip: { trigger: 'item' },
-                    }}
-                  />
-                )}
-              </ResponsiveChart>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                No hay datos disponibles
-              </div>
-            )}
-          </div>
+          {/* Category Bar Chart - Emissions */}
+          <CategoryBarChart
+            data={categoryStats.map(entry => ({
+              name: getCategoryLabel(entry.category),
+              value: toNumberOrDefault(entry.totalKgCO2e),
+              records: entry.recordCount,
+            }))}
+            title="Emisiones por Categoría"
+            loading={loadingData}
+            height={400}
+            showExport={true}
+            mode="emissions"
+          />
 
-          {/* Records Count Bar Chart */}
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              📝 Registros por Categoría
-            </h3>
-            {categoryStats.length > 0 ? (
-              <ResponsiveChart height={320}>
-                {(width) => (
-                  <BarChart
-                    width={width}
-                    height={320}
-                    xAxis={[
-                      {
-                        id: 'categories',
-                        data: categoryStats.map((entry) => entry.category),
-                        valueFormatter: (category: string) => getCategoryLabel(category),
-                        scaleType: 'band',
-                        tickLabelStyle: {
-                          angle: -45,
-                          textAnchor: 'end',
-                          fontSize: 12,
-                          fill: '#6b7280',
-                        },
-                      },
-                    ]}
-                    yAxis={[
-                      {
-                        id: 'records',
-                        tickLabelStyle: { fontSize: 12, fill: '#6b7280' },
-                      },
-                    ]}
-                    series={[
-                      {
-                        id: 'registros',
-                        data: categoryStats.map((entry) => toNumberOrDefault(entry.recordCount)),
-                        label: 'Registros',
-                        color: '#3b82f6',
-                        valueFormatter: recordValueFormatter,
-                      },
-                    ]}
-                    margin={{ top: 20, right: 20, left: 10, bottom: 70 }}
-                    grid={{ horizontal: true }}
-                    slotProps={{
-                      tooltip: { trigger: 'item' },
-                    }}
-                  />
-                )}
-              </ResponsiveChart>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                No hay datos disponibles
-              </div>
-            )}
-          </div>
+          {/* Category Bar Chart - Records Count */}
+          <CategoryBarChart
+            data={categoryStats.map(entry => ({
+              name: getCategoryLabel(entry.category),
+              value: toNumberOrDefault(entry.totalKgCO2e),
+              records: entry.recordCount,
+            }))}
+            title="Registros por Categoría"
+            loading={loadingData}
+            height={400}
+            showExport={true}
+            mode="records"
+          />
         </div>
 
-        {/* Time Series Bar Chart */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            📊 Emisiones por {groupBy === 'month' ? 'Mes' : 'Día'}
-          </h3>
-          {loadingData ? (
-            <div className="h-64 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-            </div>
-          ) : timeSeriesPoints.length > 0 ? (
-            <ResponsiveChart height={400}>
-              {(width) => (
-                <BarChart
-                  width={width}
-                  height={400}
-                  xAxis={[
-                    {
-                      id: 'period',
-                      data: timeSeriesPoints.map((point) => point.period),
-                      scaleType: 'band',
-                      tickLabelStyle: {
-                        angle: -45,
-                        textAnchor: 'end',
-                        fontSize: 12,
-                        fill: '#6b7280',
-                      },
-                    },
-                  ]}
-                  yAxis={[
-                    {
-                      id: 'kg',
-                      tickLabelStyle: { fontSize: 12, fill: '#6b7280' },
-                    },
-                  ]}
-                  series={[
-                    {
-                      id: 'emisiones',
-                      data: timeSeriesPoints.map((point) => toNumberOrDefault(point.totalKgCO2e)),
-                      label: 'Kg CO₂e',
-                      color: '#10b981',
-                      valueFormatter: kgValueFormatter,
-                    },
-                  ]}
-                  margin={{ top: 20, right: 20, left: 10, bottom: 80 }}
-                  grid={{ horizontal: true }}
-                  slotProps={{
-                    tooltip: { trigger: 'item' },
-                  }}
-                />
-              )}
-            </ResponsiveChart>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
-              No hay datos disponibles para el período seleccionado
-            </div>
-          )}
-        </div>
+        {/* Time Series Bar Chart - ECharts Professional */}
+        <CategoryBarChart
+          data={timeSeriesPoints.map(point => ({
+            name: point.period,
+            value: toNumberOrDefault(point.totalKgCO2e),
+            records: point.recordCount,
+          }))}
+          title={`Emisiones por ${groupBy === 'month' ? 'Mes' : 'Día'}`}
+          loading={loadingData}
+          height={450}
+          showExport={true}
+          mode="emissions"
+          className="mb-8"
+        />
           </div>
         </main>
       </div>

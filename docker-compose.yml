@@ -135,6 +135,12 @@ services:
       # Redis para rate limiting (Fase 4)
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      # PostgreSQL R2DBC Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ecoestudiante}
+      DB_USERNAME: ${POSTGRES_USER:-eco}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-eco}
     ports:
       - "8888:8080"
     depends_on:

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { UserProvider } from '@auth0/nextjs-auth0/client';
+import { NextUIProvider } from '@nextui-org/react';
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,12 +49,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <UserProvider>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          {children}
+          <NextThemesProvider
+            attribute="class"
+            forcedTheme="light"
+            enableSystem={false}
+            enableColorScheme={false}
+          >
+            <NextUIProvider>
+              {children}
+            </NextUIProvider>
+          </NextThemesProvider>
         </body>
       </UserProvider>
     </html>

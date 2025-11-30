@@ -1,15 +1,17 @@
 package com.ecoestudiante.gateway;
 
+import com.ecoestudiante.gateway.security.FlexibleIssuerValidator;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.*;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
@@ -30,12 +32,72 @@ import java.nio.charset.StandardCharsets;
 public class JwtDecoderConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtDecoderConfig.class);
+    private static final String DEFAULT_SECRET = "YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely";
+
+    private final Environment environment;
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
     private String auth0IssuerUri;
 
     @Value("${jwt.secret:YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}")
     private String jwtSecret;
+
+    public JwtDecoderConfig(Environment environment) {
+        this.environment = environment;
+    }
+
+    /**
+     * Valida la configuración de seguridad al inicio de la aplicación.
+     * IMPORTANTE: En producción, el JWT secret debe ser configurado explícitamente.
+     */
+    @PostConstruct
+    public void validateSecurityConfiguration() {
+        String activeProfile = String.join(",", environment.getActiveProfiles());
+        boolean isProduction = activeProfile.contains("prod") || activeProfile.contains("production");
+
+        // ============================================
+        // VALIDACIÓN CRÍTICA: JWT Secret
+        // ============================================
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            logger.error("❌ CONFIGURACIÓN CRÍTICA: JWT_SECRET no está configurado");
+            throw new IllegalStateException(
+                "JWT_SECRET es requerido. Configure la variable de entorno JWT_SECRET con un valor seguro."
+            );
+        }
+
+        if (jwtSecret.equals(DEFAULT_SECRET)) {
+            if (isProduction) {
+                logger.error("❌ CONFIGURACIÓN CRÍTICA: JWT_SECRET usa el valor por defecto en producción");
+                throw new IllegalStateException(
+                    "JWT_SECRET no puede usar el valor por defecto en producción. " +
+                    "Configure JWT_SECRET con un valor seguro de al menos 64 caracteres."
+                );
+            } else {
+                logger.warn("⚠️  JWT_SECRET usa el valor por defecto. " +
+                    "Esto es aceptable en desarrollo pero NO en producción.");
+            }
+        }
+
+        if (jwtSecret.length() < 64) {
+            logger.warn("⚠️  JWT_SECRET es muy corto ({} caracteres). " +
+                "Se recomienda al menos 64 caracteres para HS512.", jwtSecret.length());
+        }
+
+        // ============================================
+        // VALIDACIÓN: Auth0 Configuration
+        // ============================================
+        boolean isAuth0Configured = auth0IssuerUri != null &&
+            !auth0IssuerUri.isBlank() &&
+            !auth0IssuerUri.contains("xxxxx");
+
+        if (isAuth0Configured) {
+            logger.info("✅ Auth0 configurado correctamente: {}", auth0IssuerUri);
+        } else {
+            logger.info("ℹ️  Auth0 no configurado - usando solo autenticación con JWT del backend");
+        }
+
+        logger.info("✅ Validación de seguridad completada (profile: {})", activeProfile);
+    }
 
     /**
      * Decodificador JWT reactivo híbrido que soporta tanto Auth0 como backend.
@@ -63,8 +125,35 @@ public class JwtDecoderConfig {
         NimbusReactiveJwtDecoder auth0Decoder = null;
         if (auth0IssuerUri != null && !auth0IssuerUri.isBlank() && !auth0IssuerUri.contains("xxxxx")) {
             try {
-                auth0Decoder = NimbusReactiveJwtDecoder.withIssuerLocation(auth0IssuerUri).build();
-                logger.info("JWT Decoder: Auth0 configurado con issuer: {}", auth0IssuerUri);
+                // IMPORTANTE: Normalizar issuer quitando slash final si existe
+                // Auth0 puede retornar issuer con slash en .well-known pero tokens sin slash
+                String normalizedIssuer = auth0IssuerUri.endsWith("/")
+                    ? auth0IssuerUri.substring(0, auth0IssuerUri.length() - 1)
+                    : auth0IssuerUri;
+
+                // SOLUCIÓN DEFINITIVA: Usar JWK Set URI directamente en lugar de issuerLocation
+                // Esto evita que Nimbus use el issuer de .well-known/openid-configuration
+                String jwkSetUri = normalizedIssuer + "/.well-known/jwks.json";
+
+                auth0Decoder = NimbusReactiveJwtDecoder
+                    .withJwkSetUri(jwkSetUri)
+                    .build();
+
+                // CRÍTICO: Configurar validator flexible para el issuer
+                // Esto permite aceptar issuers con y sin trailing slash
+                OAuth2TokenValidator<Jwt> flexibleIssuerValidator = new FlexibleIssuerValidator(normalizedIssuer);
+                OAuth2TokenValidator<Jwt> timestampValidator = new JwtTimestampValidator();
+
+                // Combinar validators
+                OAuth2TokenValidator<Jwt> combinedValidator = new DelegatingOAuth2TokenValidator<>(
+                    flexibleIssuerValidator,
+                    timestampValidator
+                );
+
+                auth0Decoder.setJwtValidator(combinedValidator);
+
+                logger.info("JWT Decoder: Auth0 configurado con JWK Set URI: {}", jwkSetUri);
+                logger.info("JWT Decoder: FlexibleIssuerValidator configurado para: {}", normalizedIssuer);
             } catch (Exception e) {
                 logger.warn("JWT Decoder: No se pudo configurar Auth0 decoder: {}", e.getMessage());
             }

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server';
-import { getAccessToken } from '@auth0/nextjs-auth0';
+import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
 import { logger } from '@/lib/logger';
 
 /**
@@ -60,24 +60,70 @@ export async function getAuthToken(req: NextRequest): Promise<{
 
     if (isAuth0Enabled) {
       try {
-        // Intentar obtener token de Auth0 desde la sesión del servidor
-        const { accessToken } = await getAccessToken();
-        if (accessToken) {
-          logger.debug('auth-token', 'Token de Auth0 encontrado en sesión');
+        // ESTRATEGIA 1: Intentar getAccessToken() primero (método más confiable)
+        // Este método está específicamente diseñado para obtener access tokens
+        logger.debug('auth-token', '🔍 Intentando obtener token Auth0 con getAccessToken()...');
 
-          // Extraer userId del token de Auth0 (claim 'sub')
-          const userId = extractUserIdFromJwt(accessToken);
+        try {
+          const tokenResult = await getAccessToken();
+          if (tokenResult && tokenResult.accessToken) {
+            logger.info('auth-token', '✅ Token Auth0 obtenido exitosamente desde getAccessToken()', {
+              tokenLength: tokenResult.accessToken.length,
+              hasToken: true
+            });
+
+            const userId = extractUserIdFromJwt(tokenResult.accessToken);
+            return {
+              token: tokenResult.accessToken,
+              type: 'auth0',
+              userId: userId || undefined
+            };
+          } else {
+            logger.debug('auth-token', '⚠️ getAccessToken() retornó resultado vacío');
+          }
+        } catch (accessTokenError: any) {
+          logger.debug('auth-token', '⚠️ getAccessToken() falló, intentando getSession()...', {
+            error: accessTokenError.message,
+            code: accessTokenError.code
+          });
+        }
+
+        // ESTRATEGIA 2: Fallback a getSession() si getAccessToken() falla
+        // Algunas configuraciones pueden retornar el token en la sesión
+        const session = await getSession();
+
+        if (session && session.accessToken) {
+          logger.info('auth-token', '✅ Access token Auth0 obtenido desde session (fallback)', {
+            hasSession: true,
+            hasAccessToken: true,
+            userId: session.user?.sub
+          });
+
+          // Extraer userId del session.user.sub (más confiable que decodificar el token)
+          const userId = session.user?.sub || extractUserIdFromJwt(session.accessToken);
 
           return {
-            token: accessToken,
+            token: session.accessToken,
             type: 'auth0',
             userId: userId || undefined
           };
+        } else if (session && !session.accessToken) {
+          logger.warn('auth-token', '❌ Sesión Auth0 existe pero NO tiene accessToken', {
+            hasSession: true,
+            hasUser: !!session.user,
+            sessionKeys: Object.keys(session),
+            userId: session.user?.sub,
+            scope: process.env.AUTH0_SCOPE,
+            audience: process.env.AUTH0_AUDIENCE
+          });
+        } else {
+          logger.debug('auth-token', 'No hay sesión Auth0 activa');
         }
       } catch (auth0Error: any) {
         // No es un error crítico - simplemente no hay sesión de Auth0
-        logger.debug('auth-token', 'No hay sesión de Auth0 activa', {
-          error: auth0Error.message
+        logger.debug('auth-token', 'Error al obtener sesión de Auth0', {
+          error: auth0Error.message,
+          errorName: auth0Error.name
         });
       }
     } else {

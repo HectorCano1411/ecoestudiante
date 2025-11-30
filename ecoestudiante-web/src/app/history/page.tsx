@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { api } from '@/lib/api-client';
 import type { CalcHistoryResponse, CalcHistoryItem } from '@/types/calc';
 
@@ -11,7 +12,7 @@ type SortField = 'date' | 'emission' | 'category' | 'subcategory';
 type SortOrder = 'asc' | 'desc';
 
 export default function HistoryPage() {
-  const router = useRouter();
+  const { user: auth0User, isLoading: auth0Loading } = useUser();
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<CalcHistoryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,14 +22,25 @@ export default function HistoryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [dateFrom, setDateFrom] = useState<string>('');
-  const [dateTo, setDateTo] = useState<string>('');
-  const [emissionMin, setEmissionMin] = useState<string>('');
-  const [emissionMax, setEmissionMax] = useState<string>('');
-  const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set());
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const pageSize = 20;
+
+  // Filtros PENDIENTES (lo que el usuario está editando)
+  const [pendingSearchQuery, setPendingSearchQuery] = useState<string>('');
+  const [pendingDateFrom, setPendingDateFrom] = useState<string>('');
+  const [pendingDateTo, setPendingDateTo] = useState<string>('');
+  const [pendingEmissionMin, setPendingEmissionMin] = useState<string>('');
+  const [pendingEmissionMax, setPendingEmissionMax] = useState<string>('');
+  const [pendingSelectedSubcategories, setPendingSelectedSubcategories] = useState<Set<string>>(new Set());
+
+  // Filtros APLICADOS (los que realmente se usan para filtrar)
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState<string>('');
+  const [appliedDateFrom, setAppliedDateFrom] = useState<string>('');
+  const [appliedDateTo, setAppliedDateTo] = useState<string>('');
+  const [appliedEmissionMin, setAppliedEmissionMin] = useState<string>('');
+  const [appliedEmissionMax, setAppliedEmissionMax] = useState<string>('');
+  const [appliedSelectedSubcategories, setAppliedSelectedSubcategories] = useState<Set<string>>(new Set());
 
   const loadHistory = useCallback(async () => {
     try {
@@ -39,6 +51,17 @@ export default function HistoryPage() {
       params.append('page', page.toString());
       params.append('pageSize', pageSize.toString());
 
+      // Agregar filtros aplicados al request
+      if (appliedDateFrom) params.append('dateFrom', appliedDateFrom);
+      if (appliedDateTo) params.append('dateTo', appliedDateTo);
+      if (appliedEmissionMin) params.append('emissionMin', appliedEmissionMin);
+      if (appliedEmissionMax) params.append('emissionMax', appliedEmissionMax);
+      if (appliedSelectedSubcategories.size > 0) {
+        appliedSelectedSubcategories.forEach(subcat => {
+          params.append('subcategories', subcat);
+        });
+      }
+
       const data = await api<CalcHistoryResponse>(`/calc/history?${params.toString()}`);
       setHistory(data);
     } catch (e: any) {
@@ -46,18 +69,19 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [category, page, pageSize]);
+  }, [category, page, pageSize, appliedDateFrom, appliedDateTo, appliedEmissionMin, appliedEmissionMax, appliedSelectedSubcategories]);
 
   useEffect(() => {
-    // Verificar autenticación
-    const token = localStorage.getItem('authToken');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    
+    // ========================================================================
+    // SOLUCIÓN EXPERTA: NO VALIDAR AUTH EN FRONTEND
+    // ========================================================================
+    // Simplemente cargar datos. Si el backend responde 401, el interceptor
+    // del api-client redirigirá automáticamente.
+    // Esto elimina TODOS los problemas de prefetch, CORS, y redirects prematuros.
+
     loadHistory();
-  }, [category, page, loadHistory, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, page]);
 
   const toggleExpand = useCallback((calcId: string) => {
     setExpandedItems(prev => {
@@ -147,6 +171,269 @@ export default function HistoryPage() {
       secador: '💨',
     };
     return icons[appliance] || '⚡';
+  };
+
+  const getWasteTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      organic: '🌱 Residuos Orgánicos',
+      paper: '📄 Papel y Cartón',
+      plastic: '🥤 Plásticos',
+      glass: '🍾 Vidrio',
+      metal: '🔩 Metales',
+      other: '🗑️ Otros Residuos',
+    };
+    return labels[type] || type;
+  };
+
+  const getWasteTypeIcon = (type: string) => {
+    const icons: Record<string, string> = {
+      organic: '🌱',
+      paper: '📄',
+      plastic: '🥤',
+      glass: '🍾',
+      metal: '🔩',
+      other: '🗑️',
+    };
+    return icons[type] || '♻️';
+  };
+
+  const getDisposalMethodLabel = (method: string) => {
+    const labels: Record<string, string> = {
+      mixed: '♻️ Gestión Mixta',
+      recycling: '♻️ Reciclaje',
+      composting: '🌱 Compostaje',
+      landfill: '🏭 Relleno Sanitario',
+    };
+    return labels[method] || method;
+  };
+
+  const getDisposalMethodColor = (method: string) => {
+    const colors: Record<string, { bg: string; border: string; text: string }> = {
+      mixed: { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' },
+      recycling: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+      composting: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
+      landfill: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+    };
+    return colors[method] || colors.mixed;
+  };
+
+  const renderWasteDetails = (item: CalcHistoryItem) => {
+    const input = item.input;
+    const factorInfo = item.factorInfo;
+    const wasteItems = input.wasteItems || [];
+    const disposalMethod = input.disposalMethod || 'mixed';
+    const totalWeight = wasteItems.reduce((sum, item) => sum + (item.weightKg || 0), 0);
+    const disposalColors = getDisposalMethodColor(disposalMethod);
+
+    return (
+      <div className="space-y-4">
+        {/* Sección: Factor de Emisión */}
+        {factorInfo && factorInfo.value !== null && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">♻️</span>
+              <h5 className="text-sm font-bold text-gray-800">Factor de Emisión Utilizado</h5>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-green-100">
+                <div className="text-xs text-gray-600 mb-1">Valor del Factor</div>
+                <div className="text-lg font-bold text-green-700">
+                  {factorInfo.value.toFixed(6)}
+                </div>
+              </div>
+              <div className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-green-100">
+                <div className="text-xs text-gray-600 mb-1">Unidad</div>
+                <div className="text-sm font-semibold text-gray-800">
+                  {factorInfo.unit || 'N/A'}
+                </div>
+              </div>
+              {factorInfo.subcategory && (
+                <div className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-green-100">
+                  <div className="text-xs text-gray-600 mb-1">Subcategoría del Factor</div>
+                  <div className="text-sm font-semibold text-gray-800 capitalize">
+                    {factorInfo.subcategory.replace(/_/g, ' ')}
+                  </div>
+                </div>
+              )}
+            </div>
+            {totalWeight > 0 && factorInfo.value !== null && (
+              <div className="mt-3 pt-3 border-t border-green-200">
+                <div className="text-xs text-gray-600 mb-1">Cálculo de Emisión (Promedio)</div>
+                <div className="text-sm font-mono text-gray-700">
+                  {totalWeight.toFixed(2)} kg × {factorInfo.value.toFixed(6)} {factorInfo.unit || ''}
+                  {' ≈ '}
+                  <span className="font-bold text-green-700">{item.kgCO2e.toFixed(2)} kg CO₂e</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sección: Resumen de Residuos */}
+        <div className={`${disposalColors.bg} border ${disposalColors.border} rounded-lg p-4`}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">🗑️</span>
+            <h5 className="text-sm font-bold text-gray-800">Resumen de Residuos</h5>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-gray-200">
+              <div className="text-xs text-gray-600 mb-1">Peso Total Semanal</div>
+              <div className="text-lg font-bold text-gray-800">
+                {totalWeight.toFixed(2)} kg
+              </div>
+            </div>
+            <div className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-gray-200">
+              <div className="text-xs text-gray-600 mb-1">Tipos de Residuos</div>
+              <div className="text-lg font-bold text-gray-800">
+                {wasteItems.length} {wasteItems.length === 1 ? 'tipo' : 'tipos'}
+              </div>
+            </div>
+            <div className="bg-white/60 backdrop-blur-sm p-3 rounded-lg border border-gray-200">
+              <div className="text-xs text-gray-600 mb-1">Estimación Mensual</div>
+              <div className="text-lg font-bold text-gray-800">
+                {(totalWeight * 4.3).toFixed(1)} kg
+              </div>
+            </div>
+          </div>
+
+          {/* Método de Disposición */}
+          <div className="pt-3 border-t border-gray-200">
+            <div className="text-xs text-gray-600 mb-2">Método de Gestión</div>
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 ${disposalColors.border} ${disposalColors.bg}`}>
+              <span className="text-lg font-bold ${disposalColors.text}">
+                {getDisposalMethodLabel(disposalMethod)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Sección: Detalles de Cada Tipo de Residuo */}
+        {wasteItems.length > 0 && (
+          <div className="border-t pt-4">
+            <div className="text-xs text-gray-500 mb-3 font-semibold">
+              📊 Desglose por Tipo de Residuo ({wasteItems.length} {wasteItems.length === 1 ? 'tipo' : 'tipos'})
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {wasteItems.map((wasteItem, idx) => {
+                const percentage = totalWeight > 0 ? (wasteItem.weightKg / totalWeight) * 100 : 0;
+                return (
+                  <div
+                    key={idx}
+                    className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{getWasteTypeIcon(wasteItem.wasteType)}</span>
+                        <div>
+                          <div className="text-sm font-semibold text-gray-800">
+                            {getWasteTypeLabel(wasteItem.wasteType)}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {percentage.toFixed(1)}% del total
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-green-700">
+                          {wasteItem.weightKg.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-600">kg/semana</div>
+                      </div>
+                    </div>
+                    {/* Barra de progreso */}
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <div
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Sección: Detalles Generales */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+          {input.country && (
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="text-xs text-gray-500 mb-1">País</div>
+              <div className="font-semibold text-gray-800">{input.country}</div>
+            </div>
+          )}
+
+          {input.period && (
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <div className="text-xs text-gray-500 mb-1">Período</div>
+              <div className="font-semibold text-gray-800">{input.period}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Recomendaciones basadas en el método de disposición */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">💡</span>
+            <h5 className="text-sm font-bold text-blue-800">Recomendaciones</h5>
+          </div>
+          <ul className="space-y-2 text-xs text-blue-900">
+            {disposalMethod === 'mixed' && (
+              <>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Considera separar tus residuos para maximizar el reciclaje y reducir emisiones</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>El compostaje de orgánicos puede reducir emisiones en hasta un 75%</span>
+                </li>
+              </>
+            )}
+            {disposalMethod === 'landfill' && (
+              <>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>⚠️ El relleno sanitario genera las mayores emisiones. Considera alternativas de reciclaje</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Los residuos orgánicos en rellenos generan metano (CH₄), 25 veces más potente que CO₂</span>
+                </li>
+              </>
+            )}
+            {disposalMethod === 'recycling' && (
+              <>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>✅ Excelente gestión. Reciclar metales ahorra -2.5 kg CO₂e por kg</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Continúa separando correctamente tus residuos para maximizar el beneficio ambiental</span>
+                </li>
+              </>
+            )}
+            {disposalMethod === 'composting' && (
+              <>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>💚 ¡Perfecto! El compostaje de orgánicos tiene beneficio neto (-0.10 kg CO₂e/kg)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="flex-shrink-0">•</span>
+                  <span>Evita compostar residuos no orgánicos como plásticos o metales</span>
+                </li>
+              </>
+            )}
+            <li className="flex items-start gap-2">
+              <span className="flex-shrink-0">•</span>
+              <span>Reduce en origen: compra productos con menos empaque y prefiere reutilizables</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    );
   };
 
   const renderTransportDetails = (item: CalcHistoryItem) => {
@@ -384,10 +671,20 @@ export default function HistoryPage() {
         return renderTransportDetails(item);
       case 'electricidad':
         return renderElectricityDetails(item);
+      case 'residuos':
+        return renderWasteDetails(item);
       default:
         return (
           <div className="text-sm text-gray-600">
-            <pre className="bg-gray-50 p-3 rounded-lg overflow-x-auto">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-3">
+              <p className="text-yellow-800 text-sm mb-2">
+                ⚠️ <strong>Categoría no reconocida:</strong> {item.category}
+              </p>
+              <p className="text-yellow-700 text-xs">
+                Esta categoría aún no tiene un formato de visualización personalizado.
+              </p>
+            </div>
+            <pre className="bg-gray-50 p-3 rounded-lg overflow-x-auto text-xs">
               {JSON.stringify(item.input, null, 2)}
             </pre>
           </div>
@@ -407,15 +704,49 @@ export default function HistoryPage() {
     return Array.from(subcats).sort();
   }, [history]);
 
+  // Función para aplicar filtros pendientes
+  const applyFilters = useCallback(() => {
+    setAppliedSearchQuery(pendingSearchQuery);
+    setAppliedDateFrom(pendingDateFrom);
+    setAppliedDateTo(pendingDateTo);
+    setAppliedEmissionMin(pendingEmissionMin);
+    setAppliedEmissionMax(pendingEmissionMax);
+    setAppliedSelectedSubcategories(new Set(pendingSelectedSubcategories));
+    setPage(0); // Reset a la primera página cuando se aplican filtros
+    // Note: loadHistory se ejecutará automáticamente por el useEffect cuando cambien los filtros aplicados
+  }, [pendingSearchQuery, pendingDateFrom, pendingDateTo, pendingEmissionMin, pendingEmissionMax, pendingSelectedSubcategories]);
+
+  // Detectar si hay cambios pendientes sin aplicar
+  const hasPendingChanges = useMemo(() => {
+    return (
+      pendingSearchQuery !== appliedSearchQuery ||
+      pendingDateFrom !== appliedDateFrom ||
+      pendingDateTo !== appliedDateTo ||
+      pendingEmissionMin !== appliedEmissionMin ||
+      pendingEmissionMax !== appliedEmissionMax ||
+      pendingSelectedSubcategories.size !== appliedSelectedSubcategories.size ||
+      Array.from(pendingSelectedSubcategories).some(x => !appliedSelectedSubcategories.has(x))
+    );
+  }, [
+    pendingSearchQuery, appliedSearchQuery,
+    pendingDateFrom, appliedDateFrom,
+    pendingDateTo, appliedDateTo,
+    pendingEmissionMin, appliedEmissionMin,
+    pendingEmissionMax, appliedEmissionMax,
+    pendingSelectedSubcategories, appliedSelectedSubcategories
+  ]);
+
   // Filtrar y ordenar datos localmente
+  // NOTA: Los filtros de fecha, emisiones y subcategorías ahora se aplican en el backend
+  // Solo mantenemos búsqueda de texto y ordenamiento en el frontend
   const filteredAndSortedItems = useMemo(() => {
     if (!history?.items) return [];
 
     let filtered = [...history.items];
 
-    // Filtro de búsqueda de texto
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    // Filtro de búsqueda de texto (único filtro que queda en cliente)
+    if (appliedSearchQuery.trim()) {
+      const query = appliedSearchQuery.toLowerCase();
       filtered = filtered.filter(item => {
         const searchableText = [
           item.category,
@@ -427,38 +758,6 @@ export default function HistoryPage() {
         ].join(' ').toLowerCase();
         return searchableText.includes(query);
       });
-    }
-
-    // Filtro por rango de fechas
-    if (dateFrom) {
-      const fromDate = new Date(dateFrom);
-      filtered = filtered.filter(item => new Date(item.createdAt) >= fromDate);
-    }
-    if (dateTo) {
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999); // Incluir todo el día
-      filtered = filtered.filter(item => new Date(item.createdAt) <= toDate);
-    }
-
-    // Filtro por rango de emisiones
-    if (emissionMin) {
-      const min = parseFloat(emissionMin);
-      if (!isNaN(min)) {
-        filtered = filtered.filter(item => item.kgCO2e >= min);
-      }
-    }
-    if (emissionMax) {
-      const max = parseFloat(emissionMax);
-      if (!isNaN(max)) {
-        filtered = filtered.filter(item => item.kgCO2e <= max);
-      }
-    }
-
-    // Filtro por subcategorías seleccionadas
-    if (selectedSubcategories.size > 0) {
-      filtered = filtered.filter(item => 
-        item.subcategory && selectedSubcategories.has(item.subcategory)
-      );
     }
 
     // Ordenamiento
@@ -493,7 +792,7 @@ export default function HistoryPage() {
     });
 
     return filtered;
-  }, [history, searchQuery, dateFrom, dateTo, emissionMin, emissionMax, selectedSubcategories, sortField, sortOrder]);
+  }, [history, appliedSearchQuery, sortField, sortOrder]);
 
   // Calcular estadísticas del conjunto filtrado
   const filteredStats = useMemo(() => {
@@ -532,7 +831,7 @@ export default function HistoryPage() {
   };
 
   const toggleSubcategory = (subcat: string) => {
-    setSelectedSubcategories(prev => {
+    setPendingSelectedSubcategories(prev => {
       const newSet = new Set(prev);
       if (newSet.has(subcat)) {
         newSet.delete(subcat);
@@ -544,12 +843,20 @@ export default function HistoryPage() {
   };
 
   const clearAllFilters = () => {
-    setSearchQuery('');
-    setDateFrom('');
-    setDateTo('');
-    setEmissionMin('');
-    setEmissionMax('');
-    setSelectedSubcategories(new Set());
+    // Limpiar filtros pendientes
+    setPendingSearchQuery('');
+    setPendingDateFrom('');
+    setPendingDateTo('');
+    setPendingEmissionMin('');
+    setPendingEmissionMax('');
+    setPendingSelectedSubcategories(new Set());
+    // Limpiar filtros aplicados
+    setAppliedSearchQuery('');
+    setAppliedDateFrom('');
+    setAppliedDateTo('');
+    setAppliedEmissionMin('');
+    setAppliedEmissionMax('');
+    setAppliedSelectedSubcategories(new Set());
     setCategory('');
     setPage(0);
   };
@@ -569,24 +876,30 @@ export default function HistoryPage() {
               <h1 className="text-xl font-bold text-gray-800">EcoEstudiante</h1>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => router.push('/analytics')}
-                className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-              >
-                📊 Análisis
-              </button>
+              <Link href="/dashboard" prefetch={false}>
+                <button className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                  Dashboard
+                </button>
+              </Link>
+              <Link href="/analytics" prefetch={false}>
+                <button className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+                  📊 Análisis
+                </button>
+              </Link>
               <button
                 onClick={() => {
-                  localStorage.removeItem('authToken');
-                  localStorage.removeItem('username');
-                  localStorage.removeItem('userId');
-                  router.push('/login');
+                  // Verificar si está usando Auth0 o JWT
+                  if (auth0User) {
+                    // Logout de Auth0
+                    window.location.href = '/api/auth/logout';
+                  } else {
+                    // Logout JWT tradicional
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('username');
+                    localStorage.removeItem('userId');
+                    // Usar window.location.href para evitar problemas con CORS
+                    window.location.href = '/login';
+                  }
                 }}
                 className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
               >
@@ -600,12 +913,9 @@ export default function HistoryPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
-          >
+          <Link href="/dashboard" prefetch={false} className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2">
             <span>←</span> Volver al dashboard
-          </button>
+          </Link>
         </div>
 
         <div className="mb-8">
@@ -626,8 +936,8 @@ export default function HistoryPage() {
               <input
                 id="search"
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={pendingSearchQuery}
+                onChange={(e) => setPendingSearchQuery(e.target.value)}
                 placeholder="Buscar en todos los campos..."
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
@@ -681,8 +991,8 @@ export default function HistoryPage() {
                   <input
                     id="dateFrom"
                     type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
+                    value={pendingDateFrom}
+                    onChange={(e) => setPendingDateFrom(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
@@ -693,8 +1003,8 @@ export default function HistoryPage() {
                   <input
                     id="dateTo"
                     type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
+                    value={pendingDateTo}
+                    onChange={(e) => setPendingDateTo(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
@@ -706,8 +1016,8 @@ export default function HistoryPage() {
                     id="emissionMin"
                     type="number"
                     step="0.01"
-                    value={emissionMin}
-                    onChange={(e) => setEmissionMin(e.target.value)}
+                    value={pendingEmissionMin}
+                    onChange={(e) => setPendingEmissionMin(e.target.value)}
                     placeholder="0.00"
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
@@ -720,8 +1030,8 @@ export default function HistoryPage() {
                     id="emissionMax"
                     type="number"
                     step="0.01"
-                    value={emissionMax}
-                    onChange={(e) => setEmissionMax(e.target.value)}
+                    value={pendingEmissionMax}
+                    onChange={(e) => setPendingEmissionMax(e.target.value)}
                     placeholder="999.99"
                     className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
@@ -732,7 +1042,7 @@ export default function HistoryPage() {
               {availableSubcategories.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subcategorías ({selectedSubcategories.size} seleccionadas)
+                    Subcategorías ({pendingSelectedSubcategories.size} seleccionadas)
                   </label>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-lg">
                     {availableSubcategories.map(subcat => (
@@ -740,7 +1050,7 @@ export default function HistoryPage() {
                         key={subcat}
                         onClick={() => toggleSubcategory(subcat)}
                         className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                          selectedSubcategories.has(subcat)
+                          pendingSelectedSubcategories.has(subcat)
                             ? 'bg-green-500 text-white'
                             : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
                         }`}
@@ -752,13 +1062,32 @@ export default function HistoryPage() {
                 </div>
               )}
 
-              {/* Botón limpiar filtros */}
-              <div className="flex justify-end">
+              {/* Botones de acción */}
+              <div className="flex justify-end gap-3">
                 <button
                   onClick={clearAllFilters}
-                  className="px-4 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                  className="px-4 py-2 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
                 >
-                  🗑️ Limpiar Todos los Filtros
+                  🗑️ Limpiar Filtros
+                </button>
+                <button
+                  onClick={applyFilters}
+                  disabled={!hasPendingChanges}
+                  className={`relative px-6 py-2 text-sm rounded-lg font-bold transition-all transform ${
+                    hasPendingChanges
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl hover:scale-105'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {hasPendingChanges && (
+                    <span className="absolute -top-2 -right-2 flex h-5 w-5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-5 w-5 bg-green-500 items-center justify-center">
+                        <span className="text-white text-xs font-bold">!</span>
+                      </span>
+                    </span>
+                  )}
+                  ✓ Aplicar Filtros
                 </button>
               </div>
             </div>
@@ -811,12 +1140,11 @@ export default function HistoryPage() {
             <p className="text-gray-600 mb-6">
               Aún no has registrado ninguna huella de carbono
             </p>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Registrar Primera Huella
-            </button>
+            <Link href="/dashboard" prefetch={false}>
+              <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                Registrar Primera Huella
+              </button>
+            </Link>
           </div>
         ) : (
           <>

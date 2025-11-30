@@ -419,117 +419,346 @@ public class CalcServiceImpl implements CalcService {
   }
 
   @Override
-  public CalcDtos.CalcHistoryResponse getHistory(String userId, String category, int page, int pageSize) {
+  public CalcDtos.CalcResult computeWaste(CalcDtos.WasteInput in) {
+    // Validación de entrada
+    if (in.userId() == null || in.userId().isBlank()) {
+      throw new IllegalArgumentException("userId es requerido para computar residuos");
+    }
+    if (in.idempotencyKey() == null || in.idempotencyKey().isBlank()) {
+      throw new IllegalArgumentException("idempotencyKey es requerido para computar residuos");
+    }
+    if (in.wasteItems() == null || in.wasteItems().isEmpty()) {
+      throw new IllegalArgumentException("wasteItems no puede estar vacío");
+    }
+
+    logger.debug("Iniciando cálculo de residuos - userId: {}, items: {}, disposalMethod: {}, country: {}, period: {}",
+        in.userId(), in.wasteItems().size(), in.disposalMethod(), in.country(), in.period());
+
+    // 1) Idempotencia: si ya existe, devolvemos el mismo calcId y resultado
+    var exist = jdbc.query("""
+        select id::text, result_kg_co2e, factor_hash
+        from calculation
+        where user_id = ?::uuid
+          and category = 'residuos'
+          and input_json->>'idempotencyKey' = ?
+        limit 1
+        """,
+        ps -> {
+          ps.setObject(1, tokenUtil.normalizeUserIdToUuid(in.userId()));
+          ps.setString(2, in.idempotencyKey());
+        },
+        rs -> rs.next()
+            ? Map.of(
+                "id", rs.getString(1),
+                "kg", rs.getBigDecimal(2),
+                "hash", rs.getString(3)
+              )
+            : null
+    );
+
+    if (exist != null) {
+      logger.debug("Cálculo idempotente encontrado - calcId: {}", exist.get("id"));
+      double kgPrev = ((BigDecimal) exist.get("kg")).doubleValue();
+      return new CalcDtos.CalcResult((String) exist.get("id"), kgPrev, (String) exist.get("hash"));
+    }
+
+    // 2) Calcular emisiones para cada tipo de residuo
+    YearMonth ym = YearMonth.parse(in.period());
+    LocalDate atDate = ym.atDay(1);
+
+    // Determinar sufijo de subcategoría según método de disposición
+    String disposalSuffix = determineDisposalSuffix(in.disposalMethod());
+
+    double totalKg = 0.0;
+    java.util.List<String> factorHashesUsed = new ArrayList<>();
+    java.util.Map<String, Object> detailedBreakdown = new java.util.HashMap<>();
+
+    for (CalcDtos.WasteItem item : in.wasteItems()) {
+      String subcategory = item.wasteType() + disposalSuffix;
+
+      logger.debug("Buscando factor de emisión - subcategoría: '{}', periodo: '{}'", subcategory, in.period());
+
+      // Buscar factor de emisión específico
+      var row = jdbc.query("""
+          select ef.value, fv.hash, ef.subcategory
+          from emission_factor ef
+          join factor_version fv on fv.id = ef.version_id
+          where ef.category = 'residuos'
+            and ef.subcategory = ?
+            and (ef.country = ? or ef.country is null)
+            and fv.valid_from <= ?::date
+            and (fv.valid_to is null or fv.valid_to >= ?::date)
+          order by
+            case when ef.country = ? then 0 else 1 end, -- país exacto primero
+            fv.valid_from desc
+          limit 1
+          """,
+          ps -> {
+            ps.setString(1, subcategory);
+            ps.setString(2, in.country());
+            ps.setObject(3, atDate);
+            ps.setObject(4, atDate);
+            ps.setString(5, in.country());
+          },
+          rs -> rs.next()
+              ? Map.of(
+                  "value", rs.getBigDecimal(1),
+                  "hash", rs.getString(2),
+                  "subcategory", rs.getString(3)
+                )
+              : null
+      );
+
+      if (row == null) {
+        logger.error("No se encontró factor vigente para residuos - subcategoría: '{}', periodo: '{}'",
+            subcategory, in.period());
+        throw new IllegalStateException(
+            "No hay factor vigente para residuos tipo=" + item.wasteType() +
+            " disposición=" + in.disposalMethod() +
+            " periodo=" + in.period());
+      }
+
+      double factor = ((BigDecimal) row.get("value")).doubleValue();
+      String factorHash = (String) row.get("hash");
+      double itemKg = item.weightKg() * factor;
+
+      totalKg += itemKg;
+      if (!factorHashesUsed.contains(factorHash)) {
+        factorHashesUsed.add(factorHash);
+      }
+
+      // Guardar desglose para auditoría
+      detailedBreakdown.put(item.wasteType(), Map.of(
+          "weightKg", item.weightKg(),
+          "factor", factor,
+          "kgCO2e", itemKg,
+          "subcategory", subcategory
+      ));
+
+      logger.debug("Item calculado - tipo: '{}', peso: {} kg, factor: {}, emisiones: {} kgCO2e",
+          item.wasteType(), item.weightKg(), factor, itemKg);
+    }
+
+    // 3) Hash combinado de factores
+    String combinedHash = String.join("+", factorHashesUsed);
+
+    logger.info("Cálculo de residuos completado - total emisiones: {} kgCO2e", totalKg);
+
+    // 4) Persistencia del cálculo
+    UUID calcId = UUID.randomUUID();
+
+    // Construir JSON de entrada
+    ObjectMapper mapper = new ObjectMapper();
+    java.util.Map<String, Object> inputMap = new java.util.HashMap<>();
+
+    // Convertir wasteItems a formato serializable
+    java.util.List<Map<String, Object>> wasteItemsList = new ArrayList<>();
+    for (CalcDtos.WasteItem item : in.wasteItems()) {
+      Map<String, Object> itemMap = new java.util.HashMap<>();
+      itemMap.put("wasteType", item.wasteType());
+      itemMap.put("weightKg", item.weightKg());
+      wasteItemsList.add(itemMap);
+    }
+
+    inputMap.put("wasteItems", wasteItemsList);
+    inputMap.put("disposalMethod", in.disposalMethod());
+    inputMap.put("country", in.country());
+    inputMap.put("period", in.period());
+    inputMap.put("idempotencyKey", in.idempotencyKey());
+    inputMap.put("breakdown", detailedBreakdown);
+
+    String inputJson;
+    try {
+      inputJson = mapper.writeValueAsString(inputMap);
+    } catch (Exception e) {
+      throw new RuntimeException("Error serializando input JSON", e);
+    }
+
+    try {
+      jdbc.update("""
+          insert into calculation (id, user_id, category, input_json, result_kg_co2e, factor_hash)
+          values (?::uuid, ?::uuid, 'residuos', cast(? as jsonb), ?, ?)
+          """,
+          calcId,
+          tokenUtil.normalizeUserIdToUuid(in.userId()),
+          inputJson,
+          totalKg,
+          combinedHash
+      );
+
+      // Snapshot para auditoría
+      String factorSnapshot = String.format(
+          "{\"category\":\"residuos\",\"disposalMethod\":\"%s\",\"breakdown\":%s,\"hash\":\"%s\"}",
+          in.disposalMethod(),
+          mapper.writeValueAsString(detailedBreakdown),
+          combinedHash
+      );
+
+      jdbc.update("""
+          insert into calculation_audit (id, calculation_id, factor_snapshot)
+          values (?::uuid, ?::uuid, cast(? as jsonb))
+          """,
+          UUID.randomUUID(), calcId, factorSnapshot
+      );
+
+      return new CalcDtos.CalcResult(calcId.toString(), totalKg, combinedHash);
+
+    } catch (DataIntegrityViolationException dup) {
+      // Race condition: otro proceso insertó primero
+      try {
+        var again = jdbc.queryForMap("""
+            select id::text, result_kg_co2e, factor_hash
+            from calculation
+            where user_id = ?::uuid
+              and category = 'residuos'
+              and input_json->>'idempotencyKey' = ?
+            limit 1
+            """,
+            tokenUtil.normalizeUserIdToUuid(in.userId()), in.idempotencyKey()
+        );
+        double kg2 = ((BigDecimal) again.get("result_kg_co2e")).doubleValue();
+        return new CalcDtos.CalcResult(
+            (String) again.get("id"),
+            kg2,
+            (String) again.get("factor_hash")
+        );
+      } catch (EmptyResultDataAccessException notFound) {
+        throw new IllegalStateException(
+            "Idempotency race detected but existing row not found for userId="
+                + in.userId() + " idem=" + in.idempotencyKey(), dup);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Error al persistir cálculo de residuos", e);
+    }
+  }
+
+  /**
+   * Determina el sufijo de subcategoría según el método de disposición
+   */
+  private String determineDisposalSuffix(String disposalMethod) {
+    if (disposalMethod == null || "mixed".equals(disposalMethod)) {
+      return "_mixed"; // Gestión mixta (por defecto)
+    }
+    return switch (disposalMethod) {
+      case "recycling" -> "_recycling";
+      case "composting" -> "_composting";
+      case "landfill" -> "_landfill";
+      default -> "_mixed";
+    };
+  }
+
+  @Override
+  public CalcDtos.CalcHistoryResponse getHistory(
+      String userId,
+      String category,
+      int page,
+      int pageSize,
+      LocalDate dateFrom,
+      LocalDate dateTo,
+      Double emissionMin,
+      Double emissionMax,
+      java.util.List<String> subcategories
+  ) {
     UUID userIdUuid = tokenUtil.normalizeUserIdToUuid(userId);
     int offset = page * pageSize;
-    
+
+    // Construir condiciones WHERE dinámicamente
+    StringBuilder whereClause = new StringBuilder("WHERE c.user_id = ?::uuid");
+    java.util.List<Object> params = new ArrayList<>();
+    params.add(userIdUuid);
+
+    if (category != null && !category.isBlank()) {
+      whereClause.append(" AND c.category = ?");
+      params.add(category);
+    }
+
+    if (dateFrom != null) {
+      whereClause.append(" AND c.created_at >= ?::timestamp");
+      params.add(dateFrom.atStartOfDay());
+    }
+
+    if (dateTo != null) {
+      whereClause.append(" AND c.created_at <= ?::timestamp");
+      params.add(dateTo.atTime(23, 59, 59));
+    }
+
+    if (emissionMin != null) {
+      whereClause.append(" AND c.result_kg_co2e >= ?");
+      params.add(emissionMin);
+    }
+
+    if (emissionMax != null) {
+      whereClause.append(" AND c.result_kg_co2e <= ?");
+      params.add(emissionMax);
+    }
+
     // Contar total
-    String countSql = category != null && !category.isBlank()
-        ? "SELECT COUNT(*) FROM calculation WHERE user_id = ?::uuid AND category = ?"
-        : "SELECT COUNT(*) FROM calculation WHERE user_id = ?::uuid";
-    
-    Long total = category != null && !category.isBlank()
-        ? jdbc.queryForObject(countSql, Long.class, userIdUuid, category)
-        : jdbc.queryForObject(countSql, Long.class, userIdUuid);
+    String countSql = "SELECT COUNT(*) FROM calculation c " + whereClause;
+    Long total = jdbc.queryForObject(countSql, Long.class, params.toArray());
     
     // Obtener registros paginados con información del factor de emisión
-    // Usar subconsulta para obtener el factor_snapshot más reciente de cada cálculo
-    String sql = category != null && !category.isBlank()
-        ? """
-            SELECT 
-              c.id::text, 
-              c.category, 
-              c.input_json, 
-              c.result_kg_co2e, 
-              c.created_at,
-              (
-                SELECT ca.factor_snapshot 
-                FROM calculation_audit ca 
-                WHERE ca.calculation_id = c.id 
-                ORDER BY ca.created_at DESC 
-                LIMIT 1
-              ) as factor_snapshot
-            FROM calculation c
-            WHERE c.user_id = ?::uuid AND c.category = ?
-            ORDER BY c.created_at DESC
-            LIMIT ? OFFSET ?
-            """
-        : """
-            SELECT 
-              c.id::text, 
-              c.category, 
-              c.input_json, 
-              c.result_kg_co2e, 
-              c.created_at,
-              (
-                SELECT ca.factor_snapshot 
-                FROM calculation_audit ca 
-                WHERE ca.calculation_id = c.id 
-                ORDER BY ca.created_at DESC 
-                LIMIT 1
-              ) as factor_snapshot
-            FROM calculation c
-            WHERE c.user_id = ?::uuid
-            ORDER BY c.created_at DESC
-            LIMIT ? OFFSET ?
-            """;
+    String sql = """
+        SELECT
+          c.id::text,
+          c.category,
+          c.input_json,
+          c.result_kg_co2e,
+          c.created_at,
+          (
+            SELECT ca.factor_snapshot
+            FROM calculation_audit ca
+            WHERE ca.calculation_id = c.id
+            ORDER BY ca.created_at DESC
+            LIMIT 1
+          ) as factor_snapshot
+        FROM calculation c
+        """ + whereClause + """
+
+        ORDER BY c.created_at DESC
+        LIMIT ? OFFSET ?
+        """;
     
-    java.util.List<CalcDtos.CalcHistoryItem> items = category != null && !category.isBlank()
-        ? jdbc.query(sql,
-            (rs, rowNum) -> {
-              try {
-                ObjectMapper mapper = new ObjectMapper();
-                Map<String, Object> input = mapper.readValue(rs.getString("input_json"), 
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-                
-                String cat = rs.getString("category");
-                String subcategory = extractSubcategory(cat, input);
-                
-                // Extraer información del factor de emisión desde factor_snapshot
-                CalcDtos.FactorInfo factorInfo = extractFactorInfo(rs.getString("factor_snapshot"));
-                
-                return new CalcDtos.CalcHistoryItem(
-                  rs.getString("id"),
-                  cat,
-                  subcategory,
-                  input,
-                  rs.getBigDecimal("result_kg_co2e").doubleValue(),
-                  factorInfo,
-                  rs.getTimestamp("created_at").toLocalDateTime()
-                );
-              } catch (Exception e) {
-                throw new RuntimeException("Error parsing JSON", e);
-              }
-            },
-            userIdUuid, category, pageSize, offset)
-        : jdbc.query(sql,
-            (rs, rowNum) -> {
-              try {
-                ObjectMapper mapper = new ObjectMapper();
-                Map<String, Object> input = mapper.readValue(rs.getString("input_json"), 
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-                
-                String cat = rs.getString("category");
-                String subcategory = extractSubcategory(cat, input);
-                
-                // Extraer información del factor de emisión desde factor_snapshot
-                CalcDtos.FactorInfo factorInfo = extractFactorInfo(rs.getString("factor_snapshot"));
-                
-                return new CalcDtos.CalcHistoryItem(
-                  rs.getString("id"),
-                  cat,
-                  subcategory,
-                  input,
-                  rs.getBigDecimal("result_kg_co2e").doubleValue(),
-                  factorInfo,
-                  rs.getTimestamp("created_at").toLocalDateTime()
-                );
-              } catch (Exception e) {
-                throw new RuntimeException("Error parsing JSON", e);
-              }
-            },
-            userIdUuid, pageSize, offset);
-    
+    // Agregar parámetros de paginación
+    params.add(pageSize);
+    params.add(offset);
+
+    java.util.List<CalcDtos.CalcHistoryItem> items = jdbc.query(sql,
+        (rs, rowNum) -> {
+          try {
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Object> input = mapper.readValue(rs.getString("input_json"),
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+
+            String cat = rs.getString("category");
+            String subcategory = extractSubcategory(cat, input);
+
+            // Extraer información del factor de emisión desde factor_snapshot
+            CalcDtos.FactorInfo factorInfo = extractFactorInfo(rs.getString("factor_snapshot"));
+
+            return new CalcDtos.CalcHistoryItem(
+              rs.getString("id"),
+              cat,
+              subcategory,
+              input,
+              rs.getBigDecimal("result_kg_co2e").doubleValue(),
+              factorInfo,
+              rs.getTimestamp("created_at").toLocalDateTime()
+            );
+          } catch (Exception e) {
+            throw new RuntimeException("Error parsing JSON", e);
+          }
+        },
+        params.toArray());
+
+    // Filtrar por subcategorías si se especificaron (filtro post-consulta)
+    if (subcategories != null && !subcategories.isEmpty()) {
+      items = items.stream()
+          .filter(item -> item.subcategory() != null && subcategories.contains(item.subcategory()))
+          .collect(java.util.stream.Collectors.toList());
+      // Actualizar el total después del filtro de subcategorías
+      total = (long) items.size();
+    }
+
     return new CalcDtos.CalcHistoryResponse(
       items != null ? items : new ArrayList<>(),
       total != null ? total : 0L,
@@ -625,7 +854,32 @@ public class CalcServiceImpl implements CalcService {
           }
         }
         return "Electricidad";
-        
+
+      } else if ("residuos".equals(category)) {
+        // Para residuos, mostrar los tipos de residuos generados
+        Object wasteItemsObj = input.get("wasteItems");
+        if (wasteItemsObj instanceof java.util.List) {
+          @SuppressWarnings("unchecked")
+          java.util.List<Map<String, Object>> wasteItems = (java.util.List<Map<String, Object>>) wasteItemsObj;
+          if (wasteItems != null && !wasteItems.isEmpty()) {
+            // Mapear tipos de residuos a español
+            java.util.List<String> wasteLabels = wasteItems.stream().map(item -> {
+              String wasteType = (String) item.get("wasteType");
+              return switch (wasteType) {
+                case "organic" -> "Orgánico";
+                case "paper" -> "Papel/Cartón";
+                case "plastic" -> "Plástico";
+                case "glass" -> "Vidrio";
+                case "metal" -> "Metal";
+                case "other" -> "Otros";
+                default -> wasteType;
+              };
+            }).collect(java.util.stream.Collectors.toList());
+            return String.join(", ", wasteLabels);
+          }
+        }
+        return "Residuos";
+
       } else {
         // Para otras categorías, retornar la categoría misma
         return category;

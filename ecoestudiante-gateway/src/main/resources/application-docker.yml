@@ -51,9 +51,32 @@ spring:
       port: ${SPRING_REDIS_PORT:6379}
       timeout: 2000ms
 
+  # R2DBC para auto-create usuarios Auth0
+  # Usa el mismo PostgreSQL que el backend
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:ecoestudiante}
+    username: ${DB_USERNAME:eco}
+    password: ${DB_PASSWORD:eco}
+    pool:
+      initial-size: 5
+      max-size: 10
+      max-idle-time: 30m
+
+  # Auth0 Configuration (opcional - autenticación dual)
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH0_ISSUER_BASE_URL:}
+          audience: ${AUTH0_AUDIENCE:https://api.ecoestudiante.com}
+
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely}
+
+# CORS Configuration
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 # Actuator (health checks para Docker/K8s)
 management:

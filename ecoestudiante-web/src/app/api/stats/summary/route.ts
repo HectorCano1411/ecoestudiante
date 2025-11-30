@@ -2,71 +2,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendFetch } from '@/lib/api-server';
 import { logger } from '@/lib/logger';
+import { getAuthToken } from '@/lib/auth-token';
 
 /**
- * SOLUCIÓN DEFINITIVA: Eliminamos completamente la dependencia de Auth0
- * porque @auth0/nextjs-auth0 v3.3.0 NO es compatible con Next.js 15.
- * Este endpoint SOLO soporta autenticación JWT tradicional del header Authorization.
+ * GET /api/stats/summary
+ *
+ * AUTENTICACIÓN DUAL: Soporta tanto JWT tradicional como Auth0.
+ *
+ * El helper getAuthToken() maneja automáticamente:
+ * - Token JWT del header Authorization (login tradicional)
+ * - Token de Auth0 desde la sesión del servidor
+ *
+ * Sin romper funcionalidad existente.
  */
 export async function GET(req: NextRequest) {
   try {
-    // SOLUCIÓN: Usar SOLO JWT del header Authorization (sin Auth0)
-    const authHeader = req.headers.get('authorization') || 
-                       req.headers.get('Authorization') ||
-                       req.headers.get('AUTHORIZATION');
-    
-    // Log para debugging (sin exponer el token completo)
-    logger.info('route:stats-summary', 'income', { 
-      hasAuthHeader: !!authHeader,
-      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : null,
-      source: authHeader?.startsWith('Bearer ') ? 'header' : 'none'
-    });
+    // ========================================================================
+    // AUTENTICACIÓN DUAL: Obtener token de Auth0 o JWT tradicional
+    // ========================================================================
+    const { token, type, userId } = await getAuthToken(req);
 
-    // Si no hay token, retornar error 401
-    if (!authHeader) {
+    if (!token) {
       logger.warn('route:stats-summary', 'No authorization token found');
       return NextResponse.json(
-        { 
-          error: 'Token requerido o inválido', 
-          message: 'No se encontró el token de autenticación. Por favor, inicia sesión nuevamente.' 
+        {
+          error: 'Token requerido o inválido',
+          message: 'No se encontró el token de autenticación. Por favor, inicia sesión nuevamente.'
         },
         { status: 401 }
       );
     }
 
-    // Validar formato del token (debe empezar con "Bearer ")
-    if (!authHeader.startsWith('Bearer ')) {
-      logger.warn('route:stats-summary', 'Invalid token format', {
-        authHeaderPrefix: authHeader.substring(0, 20)
-      });
-      return NextResponse.json(
-        { 
-          error: 'Token inválido', 
-          message: 'El formato del token de autenticación es inválido' 
-        },
-        { status: 401 }
-      );
-    }
+    logger.info('route:stats-summary', 'income', {
+      authType: type, // 'jwt' o 'auth0'
+      userId,
+      hasToken: true
+    });
 
-    // Preparar headers para el backend
-    const headers: HeadersInit = {
-      'Authorization': authHeader,
-      'Content-Type': 'application/json',
-    };
-
-    // Llamar al backend
-    // ACTUALIZADO: Nueva ruta /api/v1/calc/stats (stats ahora forma parte del bounded context calc)
-    logger.info('route:stats-summary', 'Calling backend', { 
+    logger.info('route:stats-summary', 'Calling backend', {
       backendUrl: '/api/v1/calc/stats/summary',
-      hasToken: true 
+      authType: type
     });
 
     const json = await backendFetch('/api/v1/calc/stats/summary', {
       method: 'GET',
-      headers,
+      headers: {
+        'Authorization': `Bearer ${token}`, // Enviar token al Gateway
+        'Content-Type': 'application/json',
+      },
     });
 
-    logger.info('route:stats-summary', 'outcome', { success: true });
+    logger.info('route:stats-summary', 'outcome', {
+      success: true,
+      authType: type
+    });
+
     return NextResponse.json(json);
   } catch (error: any) {
     logger.error('route:stats-summary', 'error', {

@@ -106,6 +106,18 @@
       <version>${pact.version}</version>
       <scope>test</scope>
     </dependency>
+
+    <!-- R2DBC para acceso reactivo a PostgreSQL -->
+    <!-- Necesario para crear usuarios Auth0 automáticamente en la BD -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>r2dbc-postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>

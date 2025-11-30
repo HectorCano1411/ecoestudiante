@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react';
 import { api } from '@/lib/api-client';
 import type { ElectricityInput, CalcResult } from '@/types/calc';
+import ResultModal, { type ImpactLevel } from '@/components/ResultModal';
 
 // Artefactos eléctricos comunes para estudiantes universitarios
 // Factores de emisión en kg CO2e por kWh mensual (promedio de uso típico)
@@ -211,6 +212,15 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalData, setModalData] = useState<{
+    kgCO2e: number;
+    impactLevel: ImpactLevel;
+    calcId: string;
+    additionalInfo?: { label: string; value: string }[];
+  } | null>(null);
+
   const countries = [
     { code: 'CL', name: 'Chile' },
     { code: 'AR', name: 'Argentina' },
@@ -272,6 +282,33 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
     setSelectedAppliances(new Set());
   };
 
+  /**
+   * Determina el nivel de impacto basado en las emisiones de electricidad
+   * Thresholds específicos para consumo eléctrico:
+   * - < 5 kg: muy bajo (consumo mínimo, ~12 kWh en Chile)
+   * - < 10 kg: bajo (~25 kWh en Chile)
+   * - < 20 kg: moderado (~50 kWh en Chile)
+   * - < 30 kg: alto (~75 kWh en Chile)
+   * - >= 30 kg: muy alto (consumo excesivo)
+   */
+  const determineImpactLevel = (kgCO2e: number): ImpactLevel => {
+    if (kgCO2e < 5) return 'very-low';
+    if (kgCO2e < 10) return 'low';
+    if (kgCO2e < 20) return 'moderate';
+    if (kgCO2e < 30) return 'high';
+    return 'very-high';
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setModalData(null);
+    // Limpiar formulario
+    setSelectedAppliances(new Set());
+    setCareer('');
+    setSuccess(false);
+    setResult(null);
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -317,18 +354,44 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
 
       setResult(res);
       setSuccess(true);
-      
+
+      // Preparar información adicional para el modal
+      const selectedAppliancesNames = Array.from(selectedAppliances)
+        .map(id => APPLIANCES.find(a => a.id === id)?.name)
+        .filter(Boolean)
+        .slice(0, 3); // Mostrar solo los primeros 3
+
+      const additionalInfo: { label: string; value: string }[] = [
+        {
+          label: 'Consumo Total',
+          value: `${totalKwh.toFixed(1)} kWh/mes`
+        },
+        {
+          label: 'Carrera',
+          value: career
+        },
+        {
+          label: 'Jornada',
+          value: schedule === 'diurna' ? 'Diurna' : 'Vespertina'
+        },
+        {
+          label: 'Artefactos',
+          value: `${selectedAppliances.size} seleccionados${selectedAppliancesNames.length > 0 ? ': ' + selectedAppliancesNames.join(', ') : ''}${selectedAppliances.size > 3 ? '...' : ''}`
+        },
+      ];
+
+      // Mostrar modal con resultados
+      setModalData({
+        kgCO2e: res.kgCO2e,
+        impactLevel: determineImpactLevel(res.kgCO2e),
+        calcId: res.calcId,
+        additionalInfo,
+      });
+      setShowModal(true);
+
       if (onSuccess) {
         onSuccess();
       }
-      
-      // Limpiar formulario después de éxito (con delay para mostrar el mensaje)
-      setTimeout(() => {
-        setSelectedAppliances(new Set());
-        setCareer('');
-        setSuccess(false);
-        setResult(null);
-      }, 5000);
     } catch (e: any) {
       const errorMessage = e?.message || 'Error al calcular la huella de carbono';
       setError(errorMessage);
@@ -613,6 +676,19 @@ export default function ElectricityForm({ onSuccess }: { onSuccess?: () => void 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Resultados */}
+      {modalData && (
+        <ResultModal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          kgCO2e={modalData.kgCO2e}
+          impactLevel={modalData.impactLevel}
+          category="electricidad"
+          calcId={modalData.calcId}
+          additionalInfo={modalData.additionalInfo}
+        />
       )}
     </div>
   );

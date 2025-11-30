@@ -113,11 +113,7 @@ public final class CalcDtos {
       @Schema(description = "Clave de idempotencia")
       @NotBlank String idempotencyKey,
 
-      @Schema(description = "Identificador del usuario (UUID)")
-      @Pattern(
-        regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-        message = "userId debe ser un UUID válido"
-      )
+      @Schema(description = "Identificador del usuario (UUID o Auth0 sub). Si no se proporciona, se extrae del token.")
       String userId,
 
       @Schema(description = "Latitud del origen (opcional)")
@@ -142,6 +138,56 @@ public final class CalcDtos {
       if (header == null || header.isBlank()) return this;
       return new TransportInput(distance, transportMode, fuelType, occupancy, country, period, header, userId,
           originLat, originLng, destinationLat, destinationLng, originAddress, destinationAddress);
+    }
+  }
+
+  /**
+   * Input para cálculo de residuos/desechos
+   * Metodología Híbrida (EPA WARM + GHG Protocol)
+   */
+  public record WasteItem(
+      @Schema(description = "Tipo de residuo",
+              example = "organic",
+              allowableValues = {"organic", "paper", "plastic", "glass", "metal", "other"})
+      @NotBlank
+      @Pattern(regexp = "^(organic|paper|plastic|glass|metal|other)$",
+               message = "wasteType debe ser: organic, paper, plastic, glass, metal, other")
+      String wasteType,
+
+      @Schema(description = "Peso en kilogramos", example = "3.5")
+      @Positive
+      double weightKg
+  ) {}
+
+  public record WasteInput(
+      @Schema(description = "Lista de items de residuos generados")
+      @jakarta.validation.Valid
+      java.util.List<WasteItem> wasteItems,
+
+      @Schema(description = "Método de disposición final",
+              example = "mixed",
+              allowableValues = {"mixed", "recycling", "composting", "landfill"})
+      @Pattern(regexp = "^(mixed|recycling|composting|landfill)$",
+               message = "disposalMethod debe ser: mixed, recycling, composting, landfill")
+      String disposalMethod,
+
+      @Schema(description = "País ISO-3166-1 alpha-2", example = "CL")
+      @Pattern(regexp = "^[A-Z]{2}$", message = "country debe ser ISO-2 en mayúsculas, ej: CL")
+      String country,
+
+      @Schema(description = "Período contable YYYY-MM", example = "2025-11")
+      @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$", message = "period debe ser YYYY-MM")
+      String period,
+
+      @Schema(description = "Clave de idempotencia")
+      @NotBlank String idempotencyKey,
+
+      @Schema(description = "Identificador del usuario (UUID o Auth0 sub). Si no se proporciona, se extrae del token.")
+      String userId
+  ) {
+    public WasteInput withHeaderIdempotency(String header) {
+      if (header == null || header.isBlank()) return this;
+      return new WasteInput(wasteItems, disposalMethod, country, period, header, userId);
     }
   }
 }

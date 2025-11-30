@@ -237,16 +237,16 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Auth0 Login Button */}
-              <Link
-                href="/api/auth/login"
-                className="block w-full py-3 px-4 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-all text-center flex items-center justify-center gap-2"
+              {/* Auth0 Login Button - SOLUCIÓN ANTI-CORS: Botón en lugar de Link */}
+              <button
+                onClick={() => window.location.href = '/api/auth/login'}
+                className="block w-full py-3 px-4 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M21.98 7.448L19.62 0H4.347L2.02 7.448c-1.352 4.636.258 9.659 3.768 12.37L12 24l6.212-4.182c3.51-2.711 5.12-7.734 3.768-12.37zm-9.98 5.554c-3.313 0-6-2.687-6-6s2.687-6 6-6 6 2.687 6 6-2.687 6-6 6z"/>
                 </svg>
                 Auth0 (Google, Email, etc.)
-              </Link>
+              </button>
 
               {/* Divider */}
               <div className="relative my-6">

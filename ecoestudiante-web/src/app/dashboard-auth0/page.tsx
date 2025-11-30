@@ -15,7 +15,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/api/auth/login');
+      // CRÍTICO: Usar window.location.href en lugar de router.push()
+      // router.push() causa un fetch RSC que dispara CORS con Auth0
+      // window.location.href hace navegación completa del navegador (sin CORS)
+      window.location.href = '/api/auth/login';
     }
   }, [isLoading, user, router]);
 

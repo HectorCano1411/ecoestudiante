@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import DashboardMenu from '@/components/DashboardMenu';
 import ElectricityForm from '@/components/ElectricityForm';
 import TransportForm from '@/components/TransportForm';
+import WasteForm from '@/components/WasteForm';
 import { api } from '@/lib/api-client';
 import type { StatsSummary } from '@/types/calc';
 
@@ -14,39 +16,46 @@ export default function DashboardPage() {
   const { user: auth0User, isLoading: auth0Loading } = useUser();
   const [username, setUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'menu' | 'electricity' | 'transport'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'electricity' | 'transport' | 'waste'>('menu');
   const [stats, setStats] = useState<StatsSummary | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [authMethod, setAuthMethod] = useState<'jwt' | 'auth0' | null>(null);
 
   useEffect(() => {
-    // SOLUCIÓN: Verificar JWT PRIMERO (más rápido y no bloquea)
-    // Luego verificar Auth0 si no hay JWT
+    // ========================================================================
+    // SOLUCIÓN EXPERTA: AUTH VALIDATION SIMPLIFICADA
+    // ========================================================================
+    // Verificar JWT primero (más rápido), luego confiar en Auth0 hook
+    // Si el backend responde 401, el interceptor redirigirá automáticamente.
+
     const token = localStorage.getItem('authToken');
     const user = localStorage.getItem('username');
-    
+
     if (token && user) {
-      // JWT tradicional encontrado - usar inmediatamente
+      // JWT tradicional encontrado
       setUsername(user);
       setAuthMethod('jwt');
       setLoading(false);
       return;
     }
-    
-    // Si no hay JWT, verificar Auth0 (pero no bloquear si está cargando)
-    if (!auth0Loading) {
-      if (auth0User) {
-        setUsername(auth0User.name || auth0User.email || 'Usuario');
-        setAuthMethod('auth0');
-        setLoading(false);
-        return;
-      }
-      
-      // Si no hay ninguna autenticación, redirigir al login
-      router.push('/login');
+
+    // Esperar a que Auth0 termine de cargar
+    if (auth0Loading) {
+      return;
     }
-    // Si auth0Loading es true, esperar un poco más antes de redirigir
-  }, [router, auth0User, auth0Loading]);
+
+    // Si Auth0 cargó y hay usuario, usar sus datos
+    if (auth0User) {
+      setUsername(auth0User.name || auth0User.email || 'Usuario');
+      setAuthMethod('auth0');
+      setLoading(false);
+      return;
+    }
+
+    // Si no hay ninguna sesión, dejar que el componente se cargue
+    // El backend responderá 401 y el interceptor manejará el redirect
+    setLoading(false);
+  }, [auth0User, auth0Loading]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -71,10 +80,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Cargar estadísticas cuando se muestra el menú
-    if (activeSection === 'menu' && !loading) {
+    if (activeSection === 'menu' && !loading && authMethod) {
       loadStats();
     }
-  }, [activeSection, loading, loadStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, loading, authMethod]);
 
   const handleLogout = () => {
     if (authMethod === 'auth0') {
@@ -86,7 +96,8 @@ export default function DashboardPage() {
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('username');
       localStorage.removeItem('userId');
-      router.push('/login');
+      // Usar window.location.href para evitar problemas con RSC
+      window.location.href = '/login';
     }
   };
 
@@ -114,18 +125,16 @@ export default function DashboardPage() {
               <h1 className="text-xl font-bold text-gray-800">EcoEstudiante</h1>
             </div>
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/analytics')}
-                className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-              >
-                📊 Análisis
-              </button>
-              <button
-                onClick={() => router.push('/history')}
-                className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Ver Historial
-              </button>
+              <Link href="/analytics" prefetch={false}>
+                <button className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+                  📊 Análisis
+                </button>
+              </Link>
+              <Link href="/history" prefetch={false}>
+                <button className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                  Ver Historial
+                </button>
+              </Link>
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-800">{username}</p>
                 <p className="text-xs text-gray-500">Sesión activa</p>
@@ -145,7 +154,7 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="mb-6">
-          {(activeSection === 'electricity' || activeSection === 'transport') && (
+          {(activeSection === 'electricity' || activeSection === 'transport' || activeSection === 'waste') && (
             <button
               onClick={() => setActiveSection('menu')}
               className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-2"
@@ -158,18 +167,22 @@ export default function DashboardPage() {
         {/* Page Title */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
-            {activeSection === 'menu' 
-              ? 'Mi Huella de Carbono' 
+            {activeSection === 'menu'
+              ? 'Mi Huella de Carbono'
               : activeSection === 'electricity'
               ? 'Registrar Consumo Eléctrico'
-              : 'Registrar Transporte'}
+              : activeSection === 'transport'
+              ? 'Registrar Transporte'
+              : 'Registrar Residuos'}
           </h2>
           <p className="text-gray-600">
-            {activeSection === 'menu' 
+            {activeSection === 'menu'
               ? 'Selecciona una categoría para registrar tu huella de carbono'
               : activeSection === 'electricity'
               ? 'Ingresa los datos de tu consumo eléctrico mensual'
-              : 'Registra tus viajes y calcula las emisiones de transporte'}
+              : activeSection === 'transport'
+              ? 'Registra tus viajes y calcula las emisiones de transporte'
+              : 'Registra tu generación de residuos semanal'}
           </p>
         </div>
 
@@ -179,6 +192,7 @@ export default function DashboardPage() {
             <DashboardMenu onItemClick={(itemId) => {
               if (itemId === 'electricity') setActiveSection('electricity');
               if (itemId === 'transport') setActiveSection('transport');
+              if (itemId === 'waste') setActiveSection('waste');
             }} />
             <div className="mt-8 p-6 bg-white rounded-xl border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -211,6 +225,19 @@ export default function DashboardPage() {
                   </div>
                   <span className="text-blue-600 font-medium text-xl">→</span>
                 </div>
+                <div
+                  className="flex items-center gap-4 p-4 rounded-lg border-2 border-purple-200 bg-purple-50 cursor-pointer hover:bg-purple-100 transition-colors"
+                  onClick={() => setActiveSection('waste')}
+                >
+                  <div className="w-12 h-12 bg-purple-600 text-white text-2xl rounded-lg flex items-center justify-center">
+                    🗑️
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-base font-semibold text-gray-800">Registrar Residuos</h4>
+                    <p className="text-sm text-gray-600">Calcula emisiones de tu generación de residuos</p>
+                  </div>
+                  <span className="text-purple-600 font-medium text-xl">→</span>
+                </div>
               </div>
             </div>
           </div>
@@ -230,7 +257,7 @@ export default function DashboardPage() {
             
             <ElectricityForm onSuccess={loadStats} />
           </div>
-        ) : (
+        ) : activeSection === 'transport' ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
             <div className="mb-6">
               <div className="flex items-center gap-3 mb-2">
@@ -243,8 +270,24 @@ export default function DashboardPage() {
                 Selecciona origen y destino en el mapa o ingresa la distancia manualmente
               </p>
             </div>
-            
+
             <TransportForm onSuccess={loadStats} />
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-purple-600 text-white text-xl rounded-lg flex items-center justify-center">
+                  🗑️
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800">Registrar Residuos</h3>
+              </div>
+              <p className="text-sm text-gray-600 ml-14">
+                Ingresa el peso semanal de residuos que generas por tipo
+              </p>
+            </div>
+
+            <WasteForm onSuccess={loadStats} />
           </div>
         )}
 

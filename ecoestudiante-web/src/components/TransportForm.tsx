@@ -6,6 +6,7 @@ import { api } from '@/lib/api-client';
 import SimpleMobilityMap from '@/components/SimpleMobilityMap';
 import type { Location } from '@/components/MobilityMap';
 import type { TransportInput, CalcResult } from '@/types/calc';
+import ResultModal, { type ImpactLevel } from '@/components/ResultModal';
 
 // Factores de emisión para cálculo rápido (previsualización)
 const EMISSION_FACTORS: Record<string, number> = {
@@ -133,7 +134,16 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
   const [result, setResult] = useState<CalcResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalData, setModalData] = useState<{
+    kgCO2e: number;
+    impactLevel: ImpactLevel;
+    calcId: string;
+    additionalInfo?: { label: string; value: string }[];
+  } | null>(null);
+
   // Ubicaciones del mapa
   const [origin, setOrigin] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
@@ -250,6 +260,35 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
     }
   };
 
+  /**
+   * Determina el nivel de impacto basado en las emisiones de transporte
+   * Thresholds específicos para transporte:
+   * - < 0.5 kg: muy bajo (caminar, bici, metro corto)
+   * - < 2 kg: bajo (metro/bus mediano)
+   * - < 5 kg: moderado (viajes en auto cortos/medianos)
+   * - < 10 kg: alto (viajes largos en auto)
+   * - >= 10 kg: muy alto (viajes muy largos, avión)
+   */
+  const determineImpactLevel = (kgCO2e: number): ImpactLevel => {
+    if (kgCO2e < 0.5) return 'very-low';
+    if (kgCO2e < 2) return 'low';
+    if (kgCO2e < 5) return 'moderate';
+    if (kgCO2e < 10) return 'high';
+    return 'very-high';
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setModalData(null);
+    // Limpiar formulario
+    setDistance('');
+    setOrigin(null);
+    setDestination(null);
+    setMapDistance(null);
+    setSuccess(false);
+    setResult(null);
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -258,9 +297,24 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
     setResult(null);
 
     try {
-      const userId = localStorage.getItem('userId');
+      // ========================================================================
+      // AUTENTICACIÓN DUAL: Obtener userId de JWT o Auth0
+      // ========================================================================
+      // Primero intentar con JWT tradicional (localStorage)
+      let userId = localStorage.getItem('userId');
+
+      // Si no hay userId en localStorage, obtener de Auth0
       if (!userId) {
-        throw new Error('Usuario no autenticado');
+        try {
+          const meResponse = await api<{ userId: string }>('/auth/me');
+          userId = meResponse.userId;
+        } catch (authError) {
+          throw new Error('Usuario no autenticado. Por favor, inicia sesión nuevamente.');
+        }
+      }
+
+      if (!userId) {
+        throw new Error('No se pudo identificar al usuario. Por favor, inicia sesión nuevamente.');
       }
 
       const distanceValue = parseFloat(distance);
@@ -292,20 +346,65 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
 
       setResult(res);
       setSuccess(true);
-      
+
+      // Preparar información adicional para el modal
+      const additionalInfo: { label: string; value: string }[] = [
+        {
+          label: 'Distancia',
+          value: `${distanceValue.toFixed(2)} km`
+        },
+        {
+          label: 'Modo',
+          value: transportMode === 'car'
+            ? `Auto ${fuelType === 'gasoline' ? 'Gasolina' : fuelType === 'diesel' ? 'Diésel' : fuelType === 'electric' ? 'Eléctrico' : 'Híbrido'}`
+            : transportMode === 'bus'
+            ? 'Bus'
+            : transportMode === 'metro'
+            ? 'Metro/Tren'
+            : transportMode === 'bicycle'
+            ? 'Bicicleta'
+            : transportMode === 'walking'
+            ? 'Caminando'
+            : transportMode === 'motorcycle'
+            ? 'Motocicleta'
+            : 'Avión'
+        },
+      ];
+
+      // Agregar ocupación si aplica
+      if (['car', 'bus'].includes(transportMode) && parseInt(occupancy) > 1) {
+        additionalInfo.push({
+          label: 'Pasajeros',
+          value: occupancy,
+        });
+      }
+
+      // Agregar origen/destino si existen
+      if (origin?.address) {
+        additionalInfo.push({
+          label: 'Origen',
+          value: origin.address.substring(0, 40) + (origin.address.length > 40 ? '...' : ''),
+        });
+      }
+      if (destination?.address) {
+        additionalInfo.push({
+          label: 'Destino',
+          value: destination.address.substring(0, 40) + (destination.address.length > 40 ? '...' : ''),
+        });
+      }
+
+      // Mostrar modal con resultados
+      setModalData({
+        kgCO2e: res.kgCO2e,
+        impactLevel: determineImpactLevel(res.kgCO2e),
+        calcId: res.calcId,
+        additionalInfo,
+      });
+      setShowModal(true);
+
       if (onSuccess) {
         onSuccess();
       }
-      
-      // Limpiar formulario después de éxito
-      setTimeout(() => {
-        setDistance('');
-        setOrigin(null);
-        setDestination(null);
-        setMapDistance(null);
-        setSuccess(false);
-        setResult(null);
-      }, 5000);
     } catch (e: any) {
       const errorMessage = e?.message || 'Error al calcular la huella de carbono';
       setError(errorMessage);
@@ -707,6 +806,19 @@ export default function TransportForm({ onSuccess }: { onSuccess?: () => void })
           )}
         </button>
       </form>
+
+      {/* Modal de Resultados */}
+      {modalData && (
+        <ResultModal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          kgCO2e={modalData.kgCO2e}
+          impactLevel={modalData.impactLevel}
+          category="transporte"
+          calcId={modalData.calcId}
+          additionalInfo={modalData.additionalInfo}
+        />
+      )}
     </div>
   );
 }

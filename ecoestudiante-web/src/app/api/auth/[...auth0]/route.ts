@@ -23,7 +23,7 @@ const authHandlers = isAuth0Enabled
       login: handleLogin({
         authorizationParams: {
           audience: process.env.AUTH0_AUDIENCE,
-          scope: 'openid profile email read:carbon write:carbon',
+          scope: process.env.AUTH0_SCOPE || 'openid profile email read:carbon write:carbon report:write',
         },
         returnTo: '/dashboard',
       }),

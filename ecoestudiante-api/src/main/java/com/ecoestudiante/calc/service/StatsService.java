@@ -173,6 +173,28 @@ public class StatsService {
                         logger.debug("    → Appliance: {}", subcategory);
                         categoryConditions.add("(category = 'electricidad' AND ? = ANY(SELECT jsonb_array_elements_text(input_json->'selectedAppliances')))");
                         params.add(subcategory);
+                    } else if ("residuos".equals(mainCategory)) {
+                        // Subcategoría de residuos: "organic_mixed", "plastic_recycling", etc.
+                        // Formato: {wasteType}_{disposalMethod}
+                        if (subcategory.contains("_")) {
+                            String[] wasteParts = subcategory.split("_", 2);
+                            if (wasteParts.length == 2) {
+                                String wasteType = wasteParts[0];
+                                String disposalMethod = wasteParts[1];
+                                logger.info("    → Tipo de residuo: '{}', Método de disposición: '{}'", wasteType, disposalMethod);
+                                logger.info("    → Construyendo condición SQL para residuos");
+                                // Buscar registros que tengan el wasteType y disposalMethod específicos
+                                categoryConditions.add("(category = 'residuos' AND input_json->>'disposalMethod' = ? AND EXISTS (SELECT 1 FROM jsonb_array_elements(input_json->'wasteItems') AS item WHERE item->>'wasteType' = ?))");
+                                params.add(disposalMethod);
+                                params.add(wasteType);
+                                logger.info("    → Parámetros agregados: disposalMethod='{}', wasteType='{}'", disposalMethod, wasteType);
+                            }
+                        } else {
+                            // Solo tipo de residuo sin método de disposición específico (caso poco común)
+                            logger.debug("    → Solo tipo de residuo: {}", subcategory);
+                            categoryConditions.add("(category = 'residuos' AND EXISTS (SELECT 1 FROM jsonb_array_elements(input_json->'wasteItems') AS item WHERE item->>'wasteType' = ?))");
+                            params.add(subcategory);
+                        }
                     } else {
                         // Otra categoría con subcategoría (por ahora solo filtrar por categoría principal)
                         logger.debug("    → Otra categoría: {}", mainCategory);
@@ -462,6 +484,28 @@ public class StatsService {
                                 logger.debug("    → Appliance: {}", subcategory);
                                 categoryConditions.add("(category = 'electricidad' AND ? = ANY(SELECT jsonb_array_elements_text(input_json->'selectedAppliances')))");
                                 params.add(subcategory);
+                            } else if ("residuos".equals(mainCategory)) {
+                                // Subcategoría de residuos: "organic_mixed", "plastic_recycling", etc.
+                                // Formato: {wasteType}_{disposalMethod}
+                                if (subcategory.contains("_")) {
+                                    String[] wasteParts = subcategory.split("_", 2);
+                                    if (wasteParts.length == 2) {
+                                        String wasteType = wasteParts[0];
+                                        String disposalMethod = wasteParts[1];
+                                        logger.info("    → Tipo de residuo: '{}', Método de disposición: '{}' (getTimeSeries)", wasteType, disposalMethod);
+                                        logger.info("    → Construyendo condición SQL para residuos (getTimeSeries)");
+                                        // Buscar registros que tengan el wasteType y disposalMethod específicos
+                                        categoryConditions.add("(category = 'residuos' AND input_json->>'disposalMethod' = ? AND EXISTS (SELECT 1 FROM jsonb_array_elements(input_json->'wasteItems') AS item WHERE item->>'wasteType' = ?))");
+                                        params.add(disposalMethod);
+                                        params.add(wasteType);
+                                        logger.info("    → Parámetros agregados: disposalMethod='{}', wasteType='{}'", disposalMethod, wasteType);
+                                    }
+                                } else {
+                                    // Solo tipo de residuo sin método de disposición específico (caso poco común)
+                                    logger.debug("    → Solo tipo de residuo: {} (getTimeSeries)", subcategory);
+                                    categoryConditions.add("(category = 'residuos' AND EXISTS (SELECT 1 FROM jsonb_array_elements(input_json->'wasteItems') AS item WHERE item->>'wasteType' = ?))");
+                                    params.add(subcategory);
+                                }
                             } else {
                                 // Otra categoría con subcategoría (por ahora solo filtrar por categoría principal)
                                 logger.debug("    → Otra categoría: {}", mainCategory);
@@ -770,11 +814,107 @@ public class StatsService {
                             // Si hay cualquier error, devolver lista vacía (no romper la funcionalidad)
                             appliances = java.util.Collections.emptyList();
                         }
-                        result.put(category, appliances != null && !appliances.isEmpty() 
-                            ? appliances 
+                        result.put(category, appliances != null && !appliances.isEmpty()
+                            ? appliances
                             : java.util.Collections.emptyList());
-                        logger.info("Categoría ELECTRICIDAD procesada exitosamente. Appliances agregados: {}", 
+                        logger.info("Categoría ELECTRICIDAD procesada exitosamente. Appliances agregados: {}",
                             result.get(category).size());
+                    } else if ("residuos".equals(category)) {
+                        logger.info("========== PROCESANDO CATEGORÍA RESIDUOS ==========");
+
+                        // Para residuos, extraer combinaciones de wasteType + disposalMethod
+                        java.util.Set<String> wasteSubcategories = new java.util.HashSet<>();
+
+                        try {
+                            // Primero verificar si hay datos de residuos
+                            Integer countWaste = jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM calculation WHERE user_id = ?::uuid AND category = 'residuos'",
+                                Integer.class,
+                                userIdUuid
+                            );
+                            logger.info("Total registros de residuos para usuario: {}", countWaste);
+
+                            if (countWaste != null && countWaste > 0) {
+                                logger.info("Ejecutando consulta para obtener subcategorías de residuos...");
+
+                                // Obtener wasteItems y disposalMethod de los cálculos de residuos
+                                // Usando CTE para mejor legibilidad y debugging
+                                java.util.List<String> subcats = jdbc.query("""
+                                    WITH waste_data AS (
+                                        SELECT
+                                            id,
+                                            input_json->'wasteItems' as waste_items,
+                                            input_json->>'disposalMethod' as disposal_method
+                                        FROM calculation
+                                        WHERE user_id = ?::uuid
+                                          AND category = 'residuos'
+                                          AND input_json->'wasteItems' IS NOT NULL
+                                    )
+                                    SELECT DISTINCT
+                                        jsonb_array_elements(waste_items)->>'wasteType' as waste_type,
+                                        COALESCE(disposal_method, 'mixed') as disposal_method
+                                    FROM waste_data
+                                    WHERE jsonb_array_elements(waste_items)->>'wasteType' IS NOT NULL
+                                    """,
+                                    (rs, rowNum) -> {
+                                        String wasteType = rs.getString("waste_type");
+                                        String disposalMethod = rs.getString("disposal_method");
+
+                                        logger.debug("Fila {}: wasteType={}, disposalMethod={}",
+                                            rowNum + 1, wasteType, disposalMethod);
+
+                                        if (wasteType != null && !wasteType.isBlank()) {
+                                            String subcategory = wasteType + "_" + disposalMethod;
+                                            logger.debug("  → Subcategoría generada: {}", subcategory);
+                                            return subcategory;
+                                        }
+                                        logger.debug("  → Descartado (wasteType nulo o vacío)");
+                                        return null;
+                                    },
+                                    userIdUuid
+                                );
+
+                                logger.info("Subcategorías de residuos retornadas por query: {}", subcats != null ? subcats.size() : 0);
+
+                                // Filtrar nulos y agregar al set
+                                if (subcats != null && !subcats.isEmpty()) {
+                                    int beforeSize = wasteSubcategories.size();
+                                    subcats.stream()
+                                        .filter(s -> s != null && !s.isBlank())
+                                        .forEach(s -> {
+                                            wasteSubcategories.add(s);
+                                            logger.debug("  ✓ Agregada: {}", s);
+                                        });
+                                    logger.info("Subcategorías únicas agregadas: {} (de {} registros)",
+                                        wasteSubcategories.size() - beforeSize, subcats.size());
+                                    logger.info("Lista completa de subcategorías: {}", wasteSubcategories);
+                                } else {
+                                    logger.warn("Query no retornó subcategorías (lista vacía o null)");
+                                }
+                            } else {
+                                logger.warn("No hay registros de residuos para este usuario");
+                            }
+
+                        } catch (Exception e) {
+                            logger.error("========== ERROR PROCESANDO RESIDUOS ==========");
+                            logger.error("Mensaje: {}", e.getMessage());
+                            logger.error("Stack trace:", e);
+                            logger.error("================================================");
+                        }
+
+                        // Convertir a lista ordenada
+                        java.util.List<String> finalWasteSubcategories = new java.util.ArrayList<>(wasteSubcategories);
+                        java.util.Collections.sort(finalWasteSubcategories);
+
+                        result.put(category, finalWasteSubcategories);
+                        logger.info("========== RESIDUOS: {} subcategorías finales ==========", finalWasteSubcategories.size());
+                        if (!finalWasteSubcategories.isEmpty()) {
+                            logger.info("Lista final: {}", finalWasteSubcategories);
+                        } else {
+                            logger.warn("ADVERTENCIA: No se encontraron subcategorías de residuos");
+                        }
+                        logger.info("=======================================================");
+
                     } else {
                         logger.info("Procesando categoría genérica: {}", category);
                         // Para otras categorías, solo agregar la categoría principal

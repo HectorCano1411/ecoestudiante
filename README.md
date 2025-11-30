@@ -1,853 +1,674 @@
-# EcoEstudiante Platform
+# EcoEstudiante
 
-> **Plataforma enterprise para cálculo, monitoreo y análisis de huella de carbono estudiantil con arquitectura de microservicios, orquestación Docker y observabilidad distribuida.**
+Plataforma web integral para calcular y monitorear la huella de carbono de estudiantes universitarios.
 
-Sistema robusto de gestión ambiental diseñado con Domain-Driven Design (DDD), implementando bounded contexts para cálculo de emisiones, gamificación, reportería y analítica. Incluye autenticación híbrida (JWT + OAuth2/OIDC), API Gateway con rate limiting, y preparado para observabilidad con OpenTelemetry.
+## Descripción
 
-[![Java 17](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/projects/jdk/17/)
-[![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://docs.docker.com/compose/)
+**EcoEstudiante** es un sistema completo que permite a los estudiantes calcular, monitorear y reducir su huella de carbono a través de:
 
----
+- Cálculo de emisiones de CO2 en múltiples categorías (electricidad, transporte, residuos)
+- Visualización de historial con análisis detallados
+- Comparación con promedios por carrera y universidad
+- Sistema de gamificación con desafíos y logros
+- Generación de reportes personalizados (PDF, CSV, Excel)
+- Estadísticas agregadas de comportamiento sostenible
 
-## 📋 Tabla de Contenidos
+## Arquitectura
 
-- [Arquitectura General](#-arquitectura-general)
-- [Estado del Proyecto](#-estado-del-proyecto)
-- [Stack Tecnológico](#-stack-tecnológico)
-- [Bounded Contexts (DDD)](#-bounded-contexts-ddd)
-- [Requisitos Previos](#-requisitos-previos)
-- [Instalación Rápida](#-instalación-rápida)
-- [Despliegue con Docker](#-despliegue-con-docker)
-- [Arquitectura de Autenticación](#-arquitectura-de-autenticación)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Guías de Desarrollo](#-guías-de-desarrollo)
-- [Testing](#-testing)
-- [Roadmap](#-roadmap)
-- [Contribución](#-contribución)
-
----
-
-## 🏗️ Arquitectura General
-
-### Arquitectura de Microservicios con API Gateway
+### Componentes del Sistema
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        NAVEGADOR                              │
-│                    http://localhost:3000                      │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                    Peticiones HTTP/HTTPS
-                             │
-┌────────────────────────────▼─────────────────────────────────┐
-│                    ecoestudiante-web                          │
-│              Next.js 15 + React 19 (SSR/SSG)                  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  - Dashboard Analytics + Visualizaciones              │   │
-│  │  - Formularios de Cálculo (Electricidad/Transporte)   │   │
-│  │  - API Routes como Backend-for-Frontend (BFF)         │   │
-│  │  - PWA con Service Workers y Offline Support          │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                   Puerto: 3000                                │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-              Token Bearer (JWT HS512 / Auth0)
-                             │
-┌────────────────────────────▼─────────────────────────────────┐
-│              ecoestudiante-gateway (API Gateway)              │
-│            Spring Cloud Gateway 4.x (WebFlux)                 │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  ✓ Rate Limiting con Redis (Token Bucket)            │   │
-│  │  ✓ JWT Validation (HS512 + Auth0 Hybrid)             │   │
-│  │  ✓ Request Routing a Bounded Contexts                │   │
-│  │  ✓ Circuit Breaker (Resilience4j)                    │   │
-│  │  ✓ Logging & Tracing (OpenTelemetry ready)           │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                   Puerto: 8888                                │
-└─────────┬───────────┬──────────────┬─────────────────────────┘
-          │           │              │
-   ┌──────▼──┐  ┌─────▼────┐  ┌──────▼──────┐
-   │  Calc   │  │   Gam    │  │  Reports    │
-   │ Context │  │ Context  │  │  Context    │
-   └──────┬──┘  └─────┬────┘  └──────┬──────┘
-          │           │              │
-┌─────────▼───────────▼──────────────▼─────────────────────────┐
-│                   ecoestudiante-api                           │
-│           Spring Boot 3.3 + Spring Security 6                 │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Bounded Contexts:                                    │   │
-│  │  • calc/      - Cálculo de emisiones CO2e             │   │
-│  │  • gamification/ - Sistema de puntos y logros         │   │
-│  │  • reports/   - Generación de reportes PDF/Excel      │   │
-│  │                                                        │   │
-│  │  Cross-cutting Concerns:                              │   │
-│  │  • auth/      - JWT + Auth0 OAuth2 Resource Server    │   │
-│  │  • error/     - Global Exception Handler              │   │
-│  │  • audit/     - Event Sourcing de cálculos            │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                   Puerto: 18080                               │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                      JDBC / Flyway
-                             │
-┌────────────────────────────▼─────────────────────────────────┐
-│                    PostgreSQL 16-alpine                       │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Schemas:                                             │   │
-│  │  • public.app_user         - Usuarios y autenticación │   │
-│  │  • public.calculation      - Cálculos de CO2e         │   │
-│  │  • public.calculation_audit - Event log              │   │
-│  │  • public.emission_factor  - Factores de emisión     │   │
-│  │  • public.checkin          - Gamification checkins   │   │
-│  │  • public.consent          - Consentimientos GDPR    │   │
-│  │  • public.report_job       - Jobs de reportería      │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                   Puerto: 5432                                │
-└────────────────────────────┬─────────────────────────────────┘
-                             │
-                  pgAdmin 4 (localhost:5050)
-                             │
-┌────────────────────────────▼─────────────────────────────────┐
-│                      Redis 7-alpine                           │
-│           Cache distribuido para Rate Limiting                │
-│                   Puerto: 6379                                │
-└───────────────────────────────────────────────────────────────┘
+┌─────────────────┐
+│   Frontend      │  Next.js 15 (TypeScript)
+│   (Puerto 3000) │  Material-UI, TailwindCSS
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   Gateway       │  Spring Cloud Gateway
+│   (Puerto 8888) │  Auth0, JWT, Rate Limiting
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   API Backend   │  Spring Boot 3.3.4 (Java 17)
+│   (Puerto 18080)│  REST API, OpenAPI/Swagger
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   PostgreSQL    │  Base de datos principal
+│   (Puerto 5432) │  Flyway migrations
+└─────────────────┘
 ```
 
-### Flujo de Request End-to-End
+### Stack Tecnológico
 
-```
-Usuario → Next.js (SSR) → API Gateway → Backend API → PostgreSQL
-   ↓                          ↓              ↓
-Browser         Rate Limit Check    JWT Validation
-Cache           Circuit Breaker     Business Logic
-                                    Event Sourcing
-```
+#### Backend
+- **Framework**: Spring Boot 3.3.4
+- **Lenguaje**: Java 17
+- **Base de datos**: PostgreSQL 16 + Flyway
+- **Seguridad**: Spring Security, JWT, OAuth2, Auth0
+- **API**: OpenAPI 3.0 con Swagger UI
+- **Testing**: JUnit 5, Testcontainers, Pact
+- **Build**: Maven + Jib (Docker)
+- **Monitoreo**: Prometheus, Spring Actuator
 
----
+#### Frontend
+- **Framework**: Next.js 15.5.5
+- **Lenguaje**: TypeScript
+- **UI**: Material-UI v7, NextUI, TailwindCSS v4
+- **Autenticación**: Auth0 SDK, NextAuth.js
+- **Gráficos**: ECharts, Recharts, MUI Charts
+- **Mapas**: Mapbox GL, Leaflet
+- **Testing**: Jest, Testing Library, Pact
 
-## 📊 Estado del Proyecto
+#### Infraestructura
+- **Contenedores**: Docker & Docker Compose
+- **Cache**: Redis (rate limiting)
+- **Admin**: pgAdmin (puerto 5050)
+- **CI/CD**: GitHub Actions
 
-### ✅ Implementado (Fases 1-2)
+## Módulos Principales
 
-| Fase | Componente | Estado | Descripción |
-|------|------------|--------|-------------|
-| **1** | **Bounded Contexts** | ✅ **Completo** | Separación DDD de calc, gamification, reports |
-| **2** | **Docker Compose** | ✅ **Completo** | Orquestación completa de 6 servicios |
-| **2** | **API Gateway** | ✅ **Completo** | Spring Cloud Gateway con JWT validation |
-| **2** | **Autenticación Híbrida** | ✅ **Completo** | JWT HS512 + Auth0 OAuth2 |
-| **2** | **Base de Datos** | ✅ **Completo** | PostgreSQL 16 + Flyway (11 migraciones) |
-| **2** | **Frontend PWA** | ✅ **Completo** | Next.js 15 con Service Workers |
+### 1. Cálculo de Emisiones (`calc`)
+Cálculo de huella de carbono en tres categorías:
 
-### 🚧 En Desarrollo (Fases 3-5)
+- **Electricidad**: Basado en consumo kWh y factores de emisión nacionales
+- **Transporte**: Múltiples modos (auto, transporte público, bicicleta) con ocupancia
+- **Residuos**: Clasificación por tipo y método de disposición
 
-| Fase | Componente | Estado | Prioridad |
-|------|------------|--------|-----------|
-| **3** | **OpenTelemetry** | ⏳ Pendiente | Alta |
-| **3** | **Distributed Tracing** | ⏳ Pendiente | Alta |
-| **4** | **Rate Limiting (Redis)** | ⚡ Infraestructura lista | Media |
-| **5** | **Contract Testing (Pact)** | ⏳ Pendiente | Media |
-| **5** | **CI/CD Pipeline** | ⏳ Pendiente | Alta |
+Características:
+- Factores de emisión actualizados (2025)
+- Metodología EPA WARM + GHG Protocol
+- Operaciones idempotentes (Idempotency-Key)
+- Auditoría completa de cálculos
 
----
+### 2. Autenticación (`auth`)
+Sistema dual de autenticación:
 
-## 🛠️ Stack Tecnológico
+- **JWT Nativo**: Registro/login tradicional con BCrypt
+- **Auth0 OAuth2**: Integración con auto-creación de usuarios
+- **Google OAuth**: Login social
+- Recuperación de contraseñas por email
+- Verificación de cuentas
 
-### Backend
+### 3. Estadísticas (`stats`)
+Análisis y visualización de datos:
 
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Java** | 17 (LTS) | Lenguaje base |
-| **Spring Boot** | 3.3.4 | Framework principal |
-| **Spring Cloud Gateway** | 4.x | API Gateway reactivo |
-| **Spring Security** | 6.x | Autenticación/Autorización |
-| **Spring Data JPA** | 3.x | Persistencia ORM |
-| **Flyway** | 10.17.1 | Migraciones de BD |
-| **PostgreSQL Driver** | 42.x | Conector JDBC |
-| **OAuth2 Resource Server** | 6.x | Validación Auth0 |
-| **Resilience4j** | 2.x (ready) | Circuit Breaker |
-| **Lombok** | 1.18.x | Reducción de boilerplate |
-| **JUnit 5** | 5.10.x | Testing |
-| **Testcontainers** | 1.20.1 | Integration tests |
+- Series de tiempo para tendencias
+- Análisis por categoría (electricidad, transporte, residuos)
+- Comparativas por carrera universitaria
+- Agregados anonimizados
 
-### Frontend
+### 4. Reportes (`reports`)
+Generación asíncrona de reportes:
 
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Next.js** | 15.x | React Framework (SSR/SSG) |
-| **React** | 19.x | UI Library |
-| **TypeScript** | 5.x | Type safety |
-| **TailwindCSS** | 3.x | Styling utility-first |
-| **Auth0 SDK** | 4.x | Autenticación social |
-| **Recharts** | 2.x | Visualización de datos |
-| **Next-PWA** | 5.x | Progressive Web App |
-| **ESLint** | 9.x | Linting |
-| **Jest** | 29.x | Testing |
+- Múltiples formatos: PDF, CSV, Excel
+- Sistema de jobs con estados
+- Descargas con expiración
+- Agregados para análisis
 
-### Infraestructura
+### 5. Gamificación (`gamification`)
+Sistema de motivación:
 
-| Tecnología | Versión | Propósito |
-|------------|---------|-----------|
-| **Docker** | 24.x+ | Containerización |
-| **Docker Compose** | 2.x+ | Orquestación local |
-| **PostgreSQL** | 16-alpine | Base de datos relacional |
-| **Redis** | 7-alpine | Cache distribuido |
-| **pgAdmin** | 4.x | Admin de PostgreSQL |
-| **Kubernetes** | 1.28+ (ready) | Orquestación producción |
-| **OpenTelemetry** | 1.x (ready) | Observabilidad |
+- Challenges (desafíos) de sostenibilidad
+- Sistema XP/Niveles
+- Streaks (rachas) de días consecutivos
+- Logros y badges
 
----
+### 6. Factores de Emisión (`factors`)
+Gestión de metadatos:
 
-## 🎯 Bounded Contexts (DDD)
+- Factores por país y categoría
+- Actualización periódica
+- Versionado de factores
+- Datos EPA y GHG Protocol
 
-### 1. Calculation Context (`/calc`)
+## Instalación y Configuración
 
-**Responsabilidad:** Cálculo de emisiones de CO2e
+> **Inicio Rápido**: Ver [QUICK_START.md](QUICK_START.md) para comenzar a desarrollar en menos de 5 minutos.
 
-```
-Entidades:
-├── Calculation (Aggregate Root)
-├── EmissionFactor (Value Object)
-└── CalculationAudit (Event)
+### Requisitos Previos
 
-Servicios:
-├── CalcService - Lógica de negocio
-├── ElectricityCalculator - Estrategia para electricidad
-└── TransportCalculator - Estrategia para transporte
+- Docker y Docker Compose
+- Java 17 (solo para desarrollo backend)
+- Node.js 20+ (solo para desarrollo frontend)
+- Maven 3.9+ (solo para desarrollo backend)
 
-Endpoints:
-├── POST /api/v1/calc/electricity
-└── POST /api/v1/calc/transport
-```
+### Variables de Entorno
 
-**Características:**
-- Idempotencia con `Idempotency-Key` header
-- Event Sourcing en `calculation_audit`
-- Validaciones con Bean Validation
-- Factores de emisión por país/región
-
-### 2. Gamification Context (`/gamification`)
-
-**Responsabilidad:** Sistema de puntos, logros y engagement
-
-```
-Entidades:
-├── CheckIn (Aggregate Root)
-├── Achievement
-└── Leaderboard
-
-Servicios:
-├── GamificationService
-└── AchievementEngine
-
-Endpoints:
-├── POST /api/v1/gam/checkin
-├── GET /api/v1/gam/achievements
-└── GET /api/v1/gam/leaderboard
-```
-
-### 3. Reports Context (`/reports`)
-
-**Responsabilidad:** Generación de reportes PDF/Excel
-
-```
-Entidades:
-└── ReportJob (Aggregate Root)
-
-Servicios:
-├── ReportService
-├── PDFGenerator
-└── ExcelGenerator
-
-Endpoints:
-├── POST /api/v1/reports/generate
-└── GET /api/v1/reports/{jobId}/download
-```
-
----
-
-## 📦 Requisitos Previos
-
-### Software Requerido
-
-- **Java 17** (Temurin/OpenJDK)
-- **Maven 3.9+**
-- **Node.js 18.x LTS** o superior
-- **npm 9+** o **pnpm 8+**
-- **Docker 24.x+** y **Docker Compose 2.x+**
-- **Git 2.x+**
-
-### Opcional
-
-- **pgAdmin 4** (si no usas Docker)
-- **Redis CLI** (para debugging)
-- **Postman/Insomnia** (para testing API)
-
-### Verificación del Entorno
+Crea un archivo `.env` en la raíz del proyecto:
 
 ```bash
-# Java
-java -version  # Debe mostrar 17.x
+# Base de datos
+POSTGRES_DB=ecoestudiante
+POSTGRES_USER=eco
+POSTGRES_PASSWORD=eco
 
-# Maven
-mvn -v  # Debe mostrar 3.9+
+# JWT (debe ser de al menos 256 bits para HS512)
+JWT_SECRET=YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely
 
-# Node.js
-node -v  # Debe mostrar v18.x o superior
+# Auth0 (opcional - solo si están TODAS las variables configuradas)
+AUTH0_ISSUER_BASE_URL=https://your-tenant.auth0.com
+AUTH0_AUDIENCE=https://api.ecoestudiante.com
+AUTH0_CLIENT_ID=your_client_id
+AUTH0_CLIENT_SECRET=your_client_secret
+AUTH0_SECRET=your_nextjs_secret
+AUTH0_BASE_URL=http://localhost:3000
 
-# Docker
-docker --version
-docker-compose --version
+# Email (opcional)
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
+
+# Mapbox (opcional - para funcionalidad de mapas)
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token
+
+# pgAdmin
+PGADMIN_EMAIL=admin@ecoestudiante.com
+PGADMIN_PASSWORD=admin123
 ```
 
----
-
-## 🚀 Instalación Rápida
-
-### Opción A: Docker Compose (Recomendado)
+### Inicio Rápido con Docker
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/tu-usuario/ecoestudiante.git
+git clone <repository-url>
 cd ecoestudiante
 
-# 2. Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales (Auth0, JWT secret, etc.)
-
-# 3. Levantar todos los servicios
-docker-compose up -d --build
-
-# 4. Verificar que todos los contenedores estén healthy
-docker-compose ps
-
-# 5. Ver logs en tiempo real
-docker-compose logs -f
-```
-
-**URLs de acceso:**
-- Frontend: http://localhost:3000
-- API Gateway: http://localhost:8888
-- API Backend: http://localhost:18080
-- pgAdmin: http://localhost:5050
-- PostgreSQL: localhost:5432
-
-### Opción B: Desarrollo Local (Sin Docker)
-
-```bash
-# 1. Levantar PostgreSQL (Docker)
-docker run -d \
-  --name eco-postgres \
-  -e POSTGRES_DB=ecoestudiante \
-  -e POSTGRES_USER=eco \
-  -e POSTGRES_PASSWORD=eco \
-  -p 5432:5432 \
-  postgres:16-alpine
-
-# 2. Backend API
-cd ecoestudiante-api
-mvn clean spring-boot:run -Dspring-boot.run.profiles=dev
-
-# 3. Gateway (en otra terminal)
-cd ../ecoestudiante-gateway
-mvn clean spring-boot:run -Dspring-boot.run.profiles=dev
-
-# 4. Frontend (en otra terminal)
-cd ../ecoestudiante-web
-npm install
-npm run dev
-```
-
----
-
-## 🐳 Despliegue con Docker
-
-### Servicios Docker Compose
-
-```yaml
-services:
-  postgres:   # PostgreSQL 16-alpine (puerto 5432)
-  pgadmin:    # pgAdmin 4 (puerto 5050)
-  redis:      # Redis 7-alpine (puerto 6379)
-  api:        # Spring Boot API (puerto 18080)
-  gateway:    # Spring Cloud Gateway (puerto 8888)
-  web:        # Next.js Frontend (puerto 3000)
-```
-
-### Comandos Útiles
-
-```bash
-# Iniciar servicios
+# 2. Levantar todos los servicios
 docker-compose up -d
 
-# Detener servicios
-docker-compose down
+# 3. Ver logs (opcional)
+docker-compose logs -f
 
-# Ver logs de un servicio específico
-docker-compose logs -f api
-docker-compose logs -f gateway
-docker-compose logs -f web
-
-# Reiniciar un servicio
-docker-compose restart api
-
-# Reconstruir imágenes
-docker-compose up -d --build
-
-# Ver estado de contenedores
-docker-compose ps
-
-# Ejecutar comando en contenedor
-docker exec -it eco-api sh
-docker exec -it eco-postgres psql -U eco -d ecoestudiante
-
-# Limpiar todo (⚠️ BORRA DATOS)
-docker-compose down -v
+# 4. Acceder a los servicios
+# Frontend:  http://localhost:3000
+# Gateway:   http://localhost:8888
+# API:       http://localhost:18080
+# Swagger:   http://localhost:18080/swagger-ui.html
+# pgAdmin:   http://localhost:5050
 ```
 
-### Health Checks
+Los servicios estarán disponibles:
+- **Frontend**: http://localhost:3000
+- **API Gateway**: http://localhost:8888
+- **API Backend**: http://localhost:18080
+- **Swagger UI**: http://localhost:18080/swagger-ui.html
+- **pgAdmin**: http://localhost:5050
+
+### Desarrollo Local con Hot Reload
+
+Para trabajar **sin reiniciar contenedores** cada vez que haces un cambio, consulta la **[Guía de Desarrollo Completa](DESARROLLO.md)** que incluye:
+
+- Opción 1: Docker con hot reload completo
+- Opción 2: Desarrollo híbrido (DB en Docker, código local)
+- Opción 3: Desarrollo 100% nativo
+
+**Inicio rápido con hot reload**:
 
 ```bash
-# PostgreSQL
-docker exec eco-postgres pg_isready -U eco
+# Modo desarrollo con hot reload automático
+docker-compose -f docker-compose.dev.yml up
 
-# Redis
-docker exec eco-redis redis-cli ping
-
-# API
-curl http://localhost:18080/actuator/health
-
-# Gateway
-curl http://localhost:8888/actuator/health
-
-# Web
-curl http://localhost:3000/
+# Los cambios en el código se reflejan automáticamente:
+# - Frontend (Next.js): < 1 segundo
+# - Backend (Spring Boot): 5-30 segundos
 ```
 
-**Ver documentación completa:** [DOCKER_GUIA.md](DOCKER_GUIA.md)
-
----
-
-## 🔐 Arquitectura de Autenticación
-
-### Sistema Híbrido: JWT + OAuth2
-
-```
-┌─────────────────────────────────────────────────────┐
-│           Autenticación Dual (Hybrid)               │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  ┌─────────────────┐      ┌────────────────────┐  │
-│  │  JWT Propio     │      │   Auth0 (OAuth2)   │  │
-│  │  (HS512)        │      │   OIDC             │  │
-│  └────────┬────────┘      └─────────┬──────────┘  │
-│           │                         │              │
-│           ▼                         ▼              │
-│  ┌─────────────────────────────────────────────┐  │
-│  │      ReactiveJwtDecoder (Gateway)           │  │
-│  │  • Valida ambos tipos de tokens             │  │
-│  │  • Normaliza claims (userId → UUID)         │  │
-│  │  • Inyecta SecurityContext                  │  │
-│  └─────────────────────────────────────────────┘  │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-### Configuración JWT (Backend)
-
-```properties
-# application.properties
-jwt.secret=YourSecretKeyShouldBeAtLeast256BitsLongForHS512AlgorithmToWorkProperlyAndSecurely
-jwt.expiration=86400000          # 24 horas
-jwt.refresh-expiration=604800000 # 7 días
-```
-
-### Configuración Auth0
-
-```env
-# .env
-AUTH0_ISSUER_BASE_URL=https://tu-dominio.auth0.com
-AUTH0_AUDIENCE=https://api.ecoestudiante.com
-AUTH0_CLIENT_ID=tu_client_id
-AUTH0_CLIENT_SECRET=tu_client_secret
-AUTH0_BASE_URL=http://localhost:3000
-```
-
-### Endpoints de Autenticación
+**O solo la infraestructura en Docker y código local**:
 
 ```bash
-# Registro tradicional
-POST /api/v1/auth/register
-Content-Type: application/json
-{
-  "email": "user@example.com",
-  "password": "SecurePass123@",
-  "username": "johndoe",
-  "carrera": "ing_informatica",
-  "jornada": "diurna"
-}
+# Terminal 1: Solo base de datos y servicios
+docker-compose -f docker-compose.dev.yml up postgres redis
 
-# Login tradicional
-POST /api/v1/auth/login
-Content-Type: application/json
-{
-  "username": "johndoe",
-  "password": "SecurePass123@"
-}
+# Terminal 2: Backend local con hot reload
+cd ecoestudiante-api && mvn spring-boot:run
 
-# Respuesta
-{
-  "token": "eyJhbGc...",
-  "refreshToken": "eyJhbGc...",
-  "type": "Bearer",
-  "userId": "uuid",
-  "username": "johndoe"
-}
-
-# Uso del token
-GET /api/v1/calc/history
-Authorization: Bearer eyJhbGc...
+# Terminal 3: Frontend local con hot reload
+cd ecoestudiante-web && npm run dev
 ```
 
----
+#### Comandos de Desarrollo
 
-## 📁 Estructura del Proyecto
-
-```
-ecoestudiante/
-├── .github/
-│   └── workflows/               # CI/CD pipelines (GitHub Actions)
-│       └── ci-cd.yml
-│
-├── ecoestudiante-api/          # Backend Spring Boot
-│   ├── src/main/
-│   │   ├── java/com/ecoestudiante/
-│   │   │   ├── auth/           # Autenticación y seguridad
-│   │   │   │   ├── JwtUtil.java
-│   │   │   │   ├── TokenUtil.java
-│   │   │   │   └── SecurityConfig.java
-│   │   │   │
-│   │   │   ├── calc/           # 📦 Calculation Context
-│   │   │   │   ├── controller/
-│   │   │   │   │   └── CalcController.java
-│   │   │   │   ├── service/
-│   │   │   │   │   ├── CalcService.java
-│   │   │   │   │   └── CalcServiceImpl.java
-│   │   │   │   ├── dto/
-│   │   │   │   │   └── CalcDtos.java
-│   │   │   │   └── exception/
-│   │   │   │       └── CalcException.java
-│   │   │   │
-│   │   │   ├── gamification/   # 📦 Gamification Context
-│   │   │   │   ├── controller/
-│   │   │   │   ├── service/
-│   │   │   │   └── model/
-│   │   │   │
-│   │   │   ├── reports/        # 📦 Reports Context
-│   │   │   │   ├── controller/
-│   │   │   │   ├── service/
-│   │   │   │   └── generator/
-│   │   │   │
-│   │   │   ├── error/          # Global Exception Handler
-│   │   │   │   └── GlobalExceptionHandler.java
-│   │   │   │
-│   │   │   └── EcoEstudianteApplication.java
-│   │   │
-│   │   └── resources/
-│   │       ├── application.properties
-│   │       ├── application-dev.properties
-│   │       ├── application-docker.properties
-│   │       └── db/migration/   # Flyway migrations
-│   │           ├── V1__init.sql
-│   │           ├── V2__emission_factor.sql
-│   │           └── ...
-│   │
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── pom.xml
-│
-├── ecoestudiante-gateway/      # API Gateway
-│   ├── src/main/
-│   │   ├── java/com/ecoestudiante/gateway/
-│   │   │   ├── SecurityConfig.java
-│   │   │   ├── JwtDecoderConfig.java
-│   │   │   └── LoggingFilter.java
-│   │   │
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       └── application-docker.yml
-│   │
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── pom.xml
-│
-├── ecoestudiante-web/          # Frontend Next.js
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── api/            # API Routes (BFF pattern)
-│   │   │   │   ├── auth/
-│   │   │   │   ├── calc/
-│   │   │   │   └── stats/
-│   │   │   │
-│   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx
-│   │   │   ├── history/
-│   │   │   ├── login/
-│   │   │   └── layout.tsx
-│   │   │
-│   │   ├── components/
-│   │   │   ├── ElectricityForm.tsx
-│   │   │   ├── TransportForm.tsx
-│   │   │   └── AnalyticsDashboard.tsx
-│   │   │
-│   │   └── lib/
-│   │       ├── api-client.ts   # Client-side API
-│   │       ├── api-server.ts   # Server-side API
-│   │       └── auth.ts         # Auth utilities
-│   │
-│   ├── public/
-│   │   ├── manifest.json       # PWA manifest
-│   │   └── icons/              # PWA icons
-│   │
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── next.config.ts
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── docker-compose.yml          # Orquestación de servicios
-├── .env.example                # Variables de entorno template
-├── DOCKER_GUIA.md             # Guía de Docker Compose
-├── DOCKER_LOGS.md             # Guía de logs y debugging
-└── README.md                  # Este archivo
-```
-
----
-
-## 📚 Guías de Desarrollo
-
-### Flujo de Trabajo Git
-
+**Backend (API)**:
 ```bash
-# Crear rama de feature
-git checkout -b feature/nueva-funcionalidad
-
-# Commits atómicos
-git add .
-git commit -m "feat: agregar endpoint de cálculo de transporte"
-
-# Push a origin
-git push -u origin feature/nueva-funcionalidad
-
-# Crear Pull Request en GitHub
-# Después de review y CI/CD success, merge a main
-```
-
-### Agregar Nueva Migración Flyway
-
-```bash
-# Crear archivo en ecoestudiante-api/src/main/resources/db/migration/
-# Nombre: V<numero>__<descripcion>.sql
-# Ejemplo: V12__add_water_consumption.sql
-
-# El número debe ser consecutivo y único
-# Flyway ejecutará automáticamente en el próximo startup
-```
-
-### Crear Nuevo Bounded Context
-
-```bash
-# 1. Crear package en ecoestudiante-api
-mkdir -p src/main/java/com/ecoestudiante/nuevo-contexto/{controller,service,dto,exception}
-
-# 2. Agregar ruta en Gateway
-# ecoestudiante-gateway/src/main/resources/application.yml
-spring:
-  cloud:
-    gateway:
-      routes:
-        - id: nuevo-contexto
-          uri: ${BACKEND_API_URL:http://api:8080}
-          predicates:
-            - Path=/api/v1/nuevo/**
-
-# 3. Implementar Controllers, Services, DTOs
-# 4. Agregar tests
-# 5. Documentar en README
-```
-
----
-
-## 🧪 Testing
-
-### Backend (JUnit 5 + Testcontainers)
-
-```bash
-# Ejecutar todos los tests
 cd ecoestudiante-api
+
+# Ejecutar en modo desarrollo
+mvn spring-boot:run
+
+# Ejecutar tests
 mvn test
-
-# Tests con cobertura
-mvn test jacoco:report
-
-# Ver reporte
-open target/site/jacoco/index.html
 
 # Tests de integración
 mvn verify
+
+# Build sin tests
+mvn clean package -DskipTests
+
+# Build con Jib (imagen Docker)
+mvn jib:build -Djib.to.image=ecoestudiante/api:latest
 ```
 
-### Frontend (Jest + React Testing Library)
+**Gateway**:
+```bash
+cd ecoestudiante-gateway
 
+# Ejecutar en modo desarrollo
+mvn spring-boot:run
+
+# Build
+mvn clean package -DskipTests
+```
+
+**Frontend (Web)**:
 ```bash
 cd ecoestudiante-web
-npm run test
+
+# Instalar dependencias
+npm install
+
+# Ejecutar en modo desarrollo
+npm run dev
+
+# Build de producción
+npm run build
+
+# Ejecutar producción
+npm start
+
+# Tests
+npm test
 
 # Tests con cobertura
 npm run test:coverage
 
-# Tests en modo watch
-npm run test:watch
+# Linter
+npm run lint
+
+# Contract tests
+npm run test:contract
 ```
 
-### Contract Testing (Pendiente - Fase 5)
+Ver **[DESARROLLO.md](DESARROLLO.md)** para guía completa de desarrollo, debugging y troubleshooting.
+
+## Comandos Docker Útiles
 
 ```bash
-# Pact entre Frontend y Gateway
-cd ecoestudiante-web
-npm run test:pact
+# Rebuild y levantar servicios
+docker-compose up -d --build
 
-# Verificación en Gateway
-cd ecoestudiante-gateway
-mvn pact:verify
+# Ver logs de un servicio específico
+docker-compose logs -f api
+docker-compose logs -f web
+docker-compose logs -f gateway
+
+# Detener servicios
+docker-compose down
+
+# Detener y eliminar volúmenes (¡cuidado! elimina datos)
+docker-compose down -v
+
+# Reiniciar un servicio específico
+docker-compose restart api
+
+# Ver estado de servicios
+docker-compose ps
+
+# Ejecutar comandos en un contenedor
+docker-compose exec api bash
+docker-compose exec postgres psql -U eco -d ecoestudiante
 ```
 
-### Manual Testing (Postman)
+## Testing
 
-**Importar colección:** `postman/EcoEstudiante.postman_collection.json`
+### Backend
 
-Endpoints clave:
-- Auth: Register, Login, Refresh Token
-- Calc: Electricidad, Transporte, History
-- Stats: Summary, Time Series, By Category
+```bash
+cd ecoestudiante-api
 
----
+# Tests unitarios
+mvn test
 
-## 🗺️ Roadmap
+# Tests de integración (usa Testcontainers)
+mvn verify
 
-### Fase 3: Observabilidad (Q1 2025) 🚧
+# Cobertura de código
+mvn test jacoco:report
+```
 
-- [ ] Integrar OpenTelemetry Collector
-- [ ] Configurar Jaeger para distributed tracing
-- [ ] Exportar métricas a Prometheus
-- [ ] Dashboards en Grafana
-- [ ] Structured logging con ELK Stack
+### Frontend
 
-### Fase 4: Optimización (Q2 2025) 🚧
+```bash
+cd ecoestudiante-web
 
-- [ ] Implementar Rate Limiting con Redis
-- [ ] Circuit Breaker con Resilience4j
-- [ ] Caching distribuido con Redis
-- [ ] Compresión de responses (Gzip/Brotli)
-- [ ] CDN para assets estáticos
+# Tests unitarios
+npm run test:unit
 
-### Fase 5: Calidad y CI/CD (Q2 2025) 🚧
+# Tests de contrato (Pact)
+npm run test:contract
 
-- [ ] Pipeline CI/CD con GitHub Actions
-- [ ] Contract Testing con Pact
-- [ ] SonarQube para análisis de código
-- [ ] Semantic versioning automático
-- [ ] Deploy automático a Kubernetes
+# Todos los tests con cobertura
+npm run test:coverage
 
-### Fase 6: Funcionalidades (Q3 2025)
+# CI tests (lint + coverage)
+npm run test:ci
+```
 
-- [ ] Cálculo de huella alimentación
-- [ ] Cálculo de huella agua
-- [ ] Comparativas inter-campus
-- [ ] Exportación de reportes PDF
-- [ ] Notificaciones push (PWA)
+## API Documentation
 
-### Futuro
+### Swagger UI
 
-- [ ] Mobile app (React Native)
-- [ ] Integración con IoT sensors
-- [ ] Machine Learning para predicciones
-- [ ] Blockchain para certificaciones
-- [ ] GraphQL API
+Una vez el backend esté corriendo, accede a la documentación interactiva:
 
----
+- **Local**: http://localhost:18080/swagger-ui.html
+- **Docker**: http://localhost:18080/swagger-ui.html
 
-## 👥 Contribución
+### Endpoints Principales
 
-### Cómo Contribuir
+#### Autenticación
+```
+POST   /api/auth/register     - Registrar nuevo usuario
+POST   /api/auth/login        - Login con credenciales
+POST   /api/auth/refresh      - Refrescar token JWT
+POST   /api/auth/logout       - Cerrar sesión
+GET    /api/auth/me           - Obtener perfil del usuario
+```
 
-1. Fork el proyecto
-2. Crea tu rama de feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'feat: add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
+#### Cálculos
+```
+POST   /api/calc/electricity  - Calcular emisiones por electricidad
+POST   /api/calc/transport    - Calcular emisiones por transporte
+POST   /api/calc/waste        - Calcular emisiones por residuos
+GET    /api/calc/history      - Historial de cálculos
+```
+
+#### Estadísticas
+```
+GET    /api/stats/summary              - Resumen general
+GET    /api/stats/time-series          - Serie temporal
+GET    /api/stats/by-category          - Por categoría
+GET    /api/stats/available-careers    - Carreras disponibles
+GET    /api/stats/available-categories - Categorías disponibles
+```
+
+#### Reportes
+```
+POST   /api/reports/generate  - Generar reporte
+GET    /api/reports/{id}      - Estado del reporte
+GET    /api/reports/{id}/download - Descargar reporte
+```
+
+## Base de Datos
+
+### Acceso con psql
+
+```bash
+# Desde Docker
+docker-compose exec postgres psql -U eco -d ecoestudiante
+
+# Desde host (si PostgreSQL está expuesto)
+psql -h localhost -p 5432 -U eco -d ecoestudiante
+```
+
+### Migraciones Flyway
+
+Las migraciones se ejecutan automáticamente al iniciar el backend. Ubicación:
+```
+ecoestudiante-api/src/main/resources/db/migration/
+```
+
+Convención de nombres:
+```
+V1__init.sql
+V2__add_auth_tables.sql
+V3__add_calculations.sql
+...
+```
+
+### pgAdmin
+
+Accede a pgAdmin en http://localhost:5050
+
+**Credenciales por defecto**:
+- Email: `admin@ecoestudiante.com`
+- Password: `admin123`
+
+**Conectar a PostgreSQL desde pgAdmin**:
+- Host: `postgres` (nombre del servicio Docker)
+- Port: `5432`
+- Username: `eco`
+- Password: `eco`
+- Database: `ecoestudiante`
+
+## Estructura del Proyecto
+
+```
+ecoestudiante/
+├── ecoestudiante-api/                 # Backend Spring Boot
+│   ├── src/main/java/com/ecoestudiante/
+│   │   ├── calc/                      # Cálculo de emisiones
+│   │   ├── auth/                      # Autenticación JWT/Auth0
+│   │   ├── gamification/              # Sistema de gamificación
+│   │   ├── reports/                   # Generación de reportes
+│   │   ├── factors/                   # Factores de emisión
+│   │   ├── stats/                     # Estadísticas
+│   │   └── common/                    # Utilidades compartidas
+│   ├── src/main/resources/
+│   │   ├── db/migration/              # Migraciones Flyway
+│   │   └── application*.yml           # Configuración
+│   ├── src/test/                      # Tests
+│   └── pom.xml                        # Maven
+│
+├── ecoestudiante-gateway/             # Spring Cloud Gateway
+│   ├── src/main/java/com/ecoestudiante/gateway/
+│   │   ├── JwtDecoderConfig.java      # Auth0
+│   │   ├── SecurityConfig.java        # Seguridad
+│   │   └── Auth0UserAutoCreateFilter.java
+│   └── pom.xml
+│
+├── ecoestudiante-web/                 # Frontend Next.js
+│   ├── src/
+│   │   ├── app/                       # App Router
+│   │   │   ├── api/                   # API Routes
+│   │   │   ├── dashboard/             # Dashboard
+│   │   │   ├── history/               # Historial
+│   │   │   ├── analytics/             # Analytics
+│   │   │   └── auth/                  # Auth0 routes
+│   │   ├── components/                # Componentes React
+│   │   │   ├── ElectricityForm.tsx
+│   │   │   ├── TransportForm.tsx
+│   │   │   ├── WasteForm.tsx
+│   │   │   ├── analytics/             # Gráficos
+│   │   │   └── charts/                # Visualizaciones
+│   │   ├── lib/                       # Utilidades
+│   │   └── types/                     # TypeScript types
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── docker-compose.yml                 # Orquestación completa
+├── .env                               # Variables de entorno
+└── README.md                          # Este archivo
+```
+
+## CI/CD
+
+### GitHub Actions
+
+El proyecto incluye workflows automatizados:
+
+**Backend (`ecoestudiante-api/.github/workflows/api-ci.yml`)**:
+- Compilación con Maven
+- Tests unitarios e integración
+- Cobertura de código
+- Build de imagen Docker con Jib
+
+**Frontend (`ecoestudiante-web/.github/workflows/web-ci.yml`)**:
+- Linting con ESLint
+- Tests con Jest
+- Cobertura de código
+- Contract tests con Pact
+- Build de Next.js
+
+### Hooks Git (Opcional)
+
+```bash
+# Configurar pre-commit en frontend
+cd ecoestudiante-web
+npm run pre-commit  # lint + tests
+
+# Configurar pre-push
+npm run pre-push    # lint + coverage
+```
+
+## Troubleshooting
+
+### El frontend no puede conectarse al backend
+
+1. Verifica que todos los servicios estén corriendo:
+   ```bash
+   docker-compose ps
+   ```
+
+2. Revisa los logs:
+   ```bash
+   docker-compose logs gateway
+   docker-compose logs api
+   ```
+
+3. Verifica las URLs en `.env`:
+   ```
+   NEXT_PUBLIC_API_URL=http://localhost:8888
+   GATEWAY_BASE_URL=http://gateway:8080
+   ```
+
+### Errores de Auth0
+
+Si no estás usando Auth0, asegúrate de que **TODAS** las variables de Auth0 estén vacías o ausentes:
+
+```bash
+# .env (sin Auth0)
+AUTH0_ISSUER_BASE_URL=
+AUTH0_CLIENT_ID=
+AUTH0_CLIENT_SECRET=
+# etc.
+```
+
+### Base de datos con errores de migración
+
+```bash
+# Ver logs de PostgreSQL
+docker-compose logs postgres
+
+# Reiniciar solo la base de datos
+docker-compose restart postgres
+
+# Si es necesario resetear (¡elimina todos los datos!)
+docker-compose down -v
+docker-compose up -d
+```
+
+### Puerto ya en uso
+
+Si algún puerto está ocupado, edita `docker-compose.yml`:
+
+```yaml
+services:
+  web:
+    ports:
+      - "3001:3000"  # Cambiar puerto externo
+```
+
+## Contribuir
+
+### Flujo de Trabajo
+
+1. Fork el repositorio
+2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit con mensajes descriptivos
+4. Push a tu fork (`git push origin feature/nueva-funcionalidad`)
 5. Abre un Pull Request
 
-### Convención de Commits
+### Estándares de Código
 
-Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
+**Backend (Java)**:
+- Código limpio siguiendo principios SOLID
+- Tests unitarios para lógica de negocio
+- Tests de integración con Testcontainers
+- Documentación en JavaDoc para APIs públicas
 
+**Frontend (TypeScript/React)**:
+- Functional components con hooks
+- TypeScript strict mode
+- Tests con Testing Library
+- ESLint + Prettier configurados
+
+### Commits
+
+Usar conventional commits:
 ```
-feat: nueva funcionalidad
-fix: corrección de bug
-docs: cambios en documentación
-style: formato, punto y coma, etc.
-refactor: refactorización de código
-test: agregar tests
-chore: cambios en build, CI, etc.
+feat: agregar cálculo de emisiones por agua
+fix: corregir bug en autenticación Auth0
+docs: actualizar README con nuevas variables
+test: agregar tests para módulo de reportes
+refactor: mejorar estructura de componentes
 ```
 
-### Code Review
+## Roadmap
 
-Todos los PRs requieren:
-- ✅ CI/CD passing
-- ✅ Code coverage > 80%
-- ✅ Al menos 1 approval
-- ✅ Sin conflictos con main
+### Fase 1 - Completada
+- [x] API REST con Spring Boot
+- [x] Frontend con Next.js
+- [x] Autenticación dual (JWT + Auth0)
+- [x] Cálculo de emisiones (electricidad, transporte, residuos)
+- [x] Historial con filtros
+- [x] Dashboard básico
+
+### Fase 2 - Completada
+- [x] Estadísticas y analytics
+- [x] Gráficos interactivos
+- [x] Exportación de datos
+- [x] Contract testing (Pact)
+- [x] CI/CD pipeline
+
+### Fase 3 - En Progreso
+- [ ] Generación completa de reportes (PDF, CSV, Excel)
+- [ ] Sistema de gamificación funcional
+- [ ] Notificaciones push
+- [ ] PWA (Progressive Web App)
+
+### Fase 4 - Planificado
+- [ ] Rate limiting en gateway
+- [ ] Caché con Redis
+- [ ] Análisis predictivo con ML
+- [ ] Recomendaciones personalizadas
+- [ ] API pública para terceros
+
+### Fase 5 - Futuro
+- [ ] App móvil nativa (React Native)
+- [ ] Integración con IoT
+- [ ] Blockchain para certificados
+- [ ] Marketplace de compensación de carbono
+
+## Licencia
+
+[Especificar licencia del proyecto]
+
+## Contacto y Soporte
+
+- **Issues**: [GitHub Issues](https://github.com/your-repo/ecoestudiante/issues)
+- **Documentación**: Ver `/docs` o Swagger UI
+- **Email**: [tu-email@ejemplo.com]
+
+## Agradecimientos
+
+- Factores de emisión basados en EPA WARM y GHG Protocol
+- Datos de electricidad de [fuente]
+- Comunidad de código abierto
 
 ---
 
-## 📄 Licencia
-
-Este proyecto es privado y de uso académico. Todos los derechos reservados © 2024-2025
-
----
-
-## 🔗 Enlaces Útiles
-
-- **Documentación Spring Boot**: https://docs.spring.io/spring-boot/
-- **Next.js Docs**: https://nextjs.org/docs
-- **Docker Compose**: https://docs.docker.com/compose/
-- **PostgreSQL**: https://www.postgresql.org/docs/
-- **Auth0**: https://auth0.com/docs
-
----
-
-## 🆘 Soporte
-
-- **Issues**: https://github.com/tu-usuario/ecoestudiante/issues
-- **Email**: soporte@ecoestudiante.com
-- **Slack**: #ecoestudiante-dev
-
----
-
-## 🙏 Agradecimientos
-
-Este proyecto es parte de una tesis de ingeniería enfocada en arquitectura de microservicios y desarrollo sostenible.
-
-**Stack inspirado en:**
-- Spring Cloud Netflix (Microservices)
-- The Twelve-Factor App
-- Domain-Driven Design (Eric Evans)
-- Clean Architecture (Robert C. Martin)
-
----
-
-**Última actualización:** Noviembre 2025 | **Versión:** 0.2.0-SNAPSHOT
+Desarrollado con dedicación para promover la sostenibilidad estudiantil.

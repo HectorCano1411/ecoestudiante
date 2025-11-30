@@ -27,7 +27,7 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
 
   const clone = res.clone();
   let preview: any = null;
-  try { preview = await clone.json(); } catch { preview = await clone.text(); }
+  try { preview = await clone.json(); } catch { preview = await res.clone().text(); }
   // preview is used for logging purposes
   logger.debug('api-server', 'response preview', preview);
 

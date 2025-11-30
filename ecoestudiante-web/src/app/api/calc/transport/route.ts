@@ -51,10 +51,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Agregar userId al body
+    // Agregar userId e idempotencyKey al body
     const requestBody = {
       ...body,
-      userId: userId.trim()
+      userId: userId.trim(),
+      idempotencyKey: idem
     };
 
     logger.info('route:transport', 'income', {
