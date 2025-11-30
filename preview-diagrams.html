@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview Diagramas Mermaid - EcoEstudiante</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 40px;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-left: 4px solid #4CAF50;
+        }
+        .diagram-container {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .mermaid {
+            text-align: center;
+            background: white;
+        }
+        .info {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌱 EcoEstudiante - Preview de Diagramas Mermaid</h1>
+    
+    <div class="info">
+        <strong>ℹ️ Instrucciones:</strong> Este archivo muestra todos los diagramas Mermaid del README.md.
+        Si los diagramas se renderizan correctamente aquí, también se verán bien en GitHub.
+        <br><br>
+        <strong>💡 Tip:</strong> Puedes abrir este archivo en cualquier navegador para previsualizar los diagramas.
+    </div>
+
+    <h2>1. Diagrama de Contexto (C4 Nivel 1)</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    Student[👤 Estudiante]
+    Admin[👨‍💼 Administrador]
+    WebApp[🌐 Aplicación Web<br/>Next.js]
+    Gateway[🚪 API Gateway<br/>Spring Cloud Gateway]
+    API[⚙️ Backend API<br/>Spring Boot]
+    DB[(🗄️ PostgreSQL<br/>AWS RDS)]
+    Redis[(⚡ Redis<br/>Cache & Rate Limiting)]
+    S3[☁️ AWS S3<br/>Reportes CSV/PDF]
+    Auth0[🔐 Auth0<br/>OAuth2 Provider]
+    Google[🔍 Google OAuth2]
+    Mapbox[🗺️ Mapbox<br/>Mapas]
+    Email[📧 SMTP Server<br/>Notificaciones]
+    
+    Student -->|HTTPS| WebApp
+    Admin -->|HTTPS| WebApp
+    WebApp -->|HTTPS| Gateway
+    WebApp -->|HTTPS| Auth0
+    WebApp -->|HTTPS| Mapbox
+    Gateway -->|HTTP| API
+    Gateway -->|HTTP| Redis
+    API -->|JDBC| DB
+    API -->|HTTP| Auth0
+    API -->|OAuth2| Google
+    API -->|SMTP| Email
+    API -->|S3 API| S3
+    
+    style Student fill:#4CAF50,color:#fff
+    style Admin fill:#2196F3,color:#fff
+    style WebApp fill:#61DAFB,color:#000
+    style Gateway fill:#6DB33F,color:#fff
+    style API fill:#6DB33F,color:#fff
+    style DB fill:#336791,color:#fff
+    style Redis fill:#DC382D,color:#fff
+    style S3 fill:#FF9900,color:#fff
+    style Auth0 fill:#EB5424,color:#fff
+    style Google fill:#4285F4,color:#fff
+    style Mapbox fill:#000000,color:#fff
+    style Email fill:#EA4335,color:#fff
+        </div>
+    </div>
+
+    <h2>2. Diagrama de Contenedores (C4 Nivel 2)</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    Web[🌐 Next.js Web App<br/>Port: 3000<br/>SSR/SSG]
+    Gateway[🚪 Spring Cloud Gateway<br/>Port: 8080<br/>Rate Limiting<br/>JWT Validation]
+    API[⚙️ Spring Boot API<br/>Port: 8080<br/>REST Services<br/>Business Logic]
+    PostgreSQL[(🗄️ PostgreSQL 16<br/>Port: 5432<br/>Primary Database)]
+    Redis[(⚡ Redis 7<br/>Port: 6379<br/>Cache & Rate Limiting)]
+    S3[☁️ AWS S3<br/>Reportes<br/>CSV/PDF]
+    Auth0[🔐 Auth0<br/>OAuth2]
+    Mapbox[🗺️ Mapbox<br/>Maps API]
+    
+    Web -->|HTTPS| Gateway
+    Web -->|HTTPS| Auth0
+    Web -->|HTTPS| Mapbox
+    Gateway -->|HTTP| API
+    Gateway -->|R2DBC| PostgreSQL
+    Gateway -->|Redis Protocol| Redis
+    API -->|JDBC| PostgreSQL
+    API -->|S3 API| S3
+    API -->|OAuth2| Auth0
+    
+    style Web fill:#000000,color:#fff
+    style Gateway fill:#6DB33F,color:#fff
+    style API fill:#6DB33F,color:#fff
+    style PostgreSQL fill:#336791,color:#fff
+    style Redis fill:#DC382D,color:#fff
+    style S3 fill:#FF9900,color:#fff
+    style Auth0 fill:#EB5424,color:#fff
+    style Mapbox fill:#000000,color:#fff
+        </div>
+    </div>
+
+    <h2>3. Diagrama de Componentes (C4 Nivel 3)</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    GatewayRouter[Route Handler]
+    JWTFilter[JWT Authentication Filter]
+    RateLimiter[Rate Limiting Filter]
+    Auth0Filter[Auth0 User Auto-Create]
+    AuthController[Auth Controller<br/>Login/Register/Refresh]
+    CalcController[Calc Controller<br/>Carbon Calculations]
+    StatsController[Stats Controller<br/>Statistics & Analytics]
+    GamificationController[Gamification Controller<br/>XP/Missions/Leaderboard]
+    AdminController[Admin Controller<br/>User Management]
+    ReportsController[Reports Controller<br/>CSV/PDF Export]
+    FactorsController[Factors Controller<br/>Emission Factors]
+    AuthService[Auth Service<br/>JWT/Auth0/OAuth2]
+    CalcService[Calc Service<br/>Emission Calculations]
+    StatsService[Stats Service<br/>Aggregations]
+    GamificationService[Gamification Service<br/>XP/Missions Logic]
+    MissionService[Mission Service<br/>Mission Management]
+    LeaderboardService[Leaderboard Service<br/>Rankings]
+    AdminService[Admin Service<br/>User CRUD]
+    ReportsService[Reports Service<br/>Report Generation]
+    EmailService[Email Service<br/>Notifications]
+    UserRepository[User Repository]
+    CalcRepository[Calculation Repository]
+    GamificationRepository[Gamification Repository]
+    MissionRepository[Mission Repository]
+    LeaderboardCacheRepository[Leaderboard Cache]
+    FactorsRepository[Factors Repository]
+    PostgreSQL[(PostgreSQL)]
+    
+    GatewayRouter --> JWTFilter
+    GatewayRouter --> RateLimiter
+    GatewayRouter --> Auth0Filter
+    GatewayRouter --> AuthController
+    GatewayRouter --> CalcController
+    GatewayRouter --> StatsController
+    GatewayRouter --> GamificationController
+    GatewayRouter --> AdminController
+    GatewayRouter --> ReportsController
+    GatewayRouter --> FactorsController
+    
+    AuthController --> AuthService
+    CalcController --> CalcService
+    StatsController --> StatsService
+    GamificationController --> GamificationService
+    GamificationController --> MissionService
+    GamificationController --> LeaderboardService
+    AdminController --> AdminService
+    ReportsController --> ReportsService
+    
+    AuthService --> UserRepository
+    CalcService --> CalcRepository
+    StatsService --> CalcRepository
+    GamificationService --> GamificationRepository
+    MissionService --> MissionRepository
+    LeaderboardService --> LeaderboardCacheRepository
+    AdminService --> UserRepository
+    ReportsService --> CalcRepository
+    ReportsService --> UserRepository
+    
+    UserRepository --> PostgreSQL
+    CalcRepository --> PostgreSQL
+    GamificationRepository --> PostgreSQL
+    MissionRepository --> PostgreSQL
+    LeaderboardCacheRepository --> PostgreSQL
+    FactorsRepository --> PostgreSQL
+    
+    style GatewayRouter fill:#6DB33F,color:#fff
+    style AuthController fill:#2196F3,color:#fff
+    style CalcController fill:#2196F3,color:#fff
+    style GamificationController fill:#2196F3,color:#fff
+    style AdminController fill:#FF9800,color:#fff
+    style AuthService fill:#4CAF50,color:#fff
+    style CalcService fill:#4CAF50,color:#fff
+    style GamificationService fill:#4CAF50,color:#fff
+        </div>
+    </div>
+
+    <h2>4. Arquitectura de Despliegue AWS EKS</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+graph TD
+    Users[👥 Usuarios]
+    DNS[🌐 Route 53<br/>DNS ecoestudiante.com]
+    CDN[☁️ CloudFront<br/>CDN Static Assets]
+    ALB[⚖️ Application Load Balancer<br/>SSL Termination<br/>Health Checks]
+    Ingress[🚪 NGINX Ingress Controller<br/>TLS/SSL<br/>Rate Limiting]
+    WebService[Web Service<br/>ClusterIP]
+    WebPod1[🌐 Web Pod 1]
+    WebPod2[🌐 Web Pod 2]
+    WebPod3[🌐 Web Pod 3]
+    GatewayService[Gateway Service<br/>ClusterIP]
+    GatewayPod1[🚪 Gateway Pod 1]
+    GatewayPod2[🚪 Gateway Pod 2]
+    APIService[API Service<br/>ClusterIP]
+    APIPod1[⚙️ API Pod 1]
+    APIPod2[⚙️ API Pod 2]
+    RedisService[Redis Service<br/>ClusterIP]
+    RedisPod[⚡ Redis Pod<br/>StatefulSet]
+    RDS[(🗄️ RDS PostgreSQL<br/>Multi-AZ<br/>Automated Backups)]
+    ElastiCache[(⚡ ElastiCache Redis<br/>High Availability)]
+    S3Bucket[☁️ S3 Bucket<br/>Reports Storage<br/>Versioning Enabled]
+    Logs[📊 CloudWatch Logs]
+    Metrics[📈 CloudWatch Metrics]
+    Alarms[🚨 CloudWatch Alarms]
+    Roles[🔐 IAM Roles<br/>Service Accounts]
+    
+    Users -->|HTTPS| DNS
+    DNS --> CDN
+    CDN --> ALB
+    ALB --> Ingress
+    Ingress --> WebService
+    Ingress --> GatewayService
+    WebService --> WebPod1
+    WebService --> WebPod2
+    WebService --> WebPod3
+    GatewayService --> GatewayPod1
+    GatewayService --> GatewayPod2
+    GatewayPod1 --> APIService
+    GatewayPod2 --> APIService
+    APIService --> APIPod1
+    APIService --> APIPod2
+    GatewayPod1 --> RedisService
+    GatewayPod2 --> RedisService
+    RedisService --> RedisPod
+    APIPod1 --> RDS
+    APIPod2 --> RDS
+    APIPod1 --> ElastiCache
+    APIPod2 --> ElastiCache
+    APIPod1 --> S3Bucket
+    APIPod2 --> S3Bucket
+    WebPod1 --> Logs
+    WebPod2 --> Logs
+    GatewayPod1 --> Logs
+    APIPod1 --> Logs
+    APIPod1 --> Metrics
+    APIPod2 --> Metrics
+    Metrics --> Alarms
+    
+    style Users fill:#4CAF50,color:#fff
+    style DNS fill:#FF9900,color:#fff
+    style CDN fill:#FF9900,color:#fff
+    style ALB fill:#FF9900,color:#fff
+    style Ingress fill:#00A86B,color:#fff
+    style WebPod1 fill:#000000,color:#fff
+    style WebPod2 fill:#000000,color:#fff
+    style WebPod3 fill:#000000,color:#fff
+    style GatewayPod1 fill:#6DB33F,color:#fff
+    style GatewayPod2 fill:#6DB33F,color:#fff
+    style APIPod1 fill:#6DB33F,color:#fff
+    style APIPod2 fill:#6DB33F,color:#fff
+    style RDS fill:#336791,color:#fff
+    style ElastiCache fill:#DC382D,color:#fff
+    style S3Bucket fill:#FF9900,color:#fff
+    style Logs fill:#FF4F8B,color:#fff
+    style Metrics fill:#FF4F8B,color:#fff
+    style Alarms fill:#FF4F8B,color:#fff
+    style Roles fill:#FF9900,color:#fff
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

@@ -100,24 +100,19 @@
 ### Diagrama de Contexto (C4 Nivel 1)
 
 ```mermaid
-graph TB
-    subgraph "EcoEstudiante System"
-        Student[👤 Estudiante]
-        Admin[👨‍💼 Administrador]
-        WebApp[🌐 Aplicación Web<br/>Next.js]
-        Gateway[🚪 API Gateway<br/>Spring Cloud Gateway]
-        API[⚙️ Backend API<br/>Spring Boot]
-        DB[(🗄️ PostgreSQL<br/>AWS RDS)]
-        Redis[(⚡ Redis<br/>Cache & Rate Limiting)]
-        S3[☁️ AWS S3<br/>Reportes CSV/PDF]
-    end
-    
-    subgraph "External Services"
-        Auth0[🔐 Auth0<br/>OAuth2 Provider]
-        Google[🔍 Google OAuth2]
-        Mapbox[🗺️ Mapbox<br/>Mapas]
-        Email[📧 SMTP Server<br/>Notificaciones]
-    end
+graph TD
+    Student[👤 Estudiante]
+    Admin[👨‍💼 Administrador]
+    WebApp[🌐 Aplicación Web<br/>Next.js]
+    Gateway[🚪 API Gateway<br/>Spring Cloud Gateway]
+    API[⚙️ Backend API<br/>Spring Boot]
+    DB[(🗄️ PostgreSQL<br/>AWS RDS)]
+    Redis[(⚡ Redis<br/>Cache & Rate Limiting)]
+    S3[☁️ AWS S3<br/>Reportes CSV/PDF]
+    Auth0[🔐 Auth0<br/>OAuth2 Provider]
+    Google[🔍 Google OAuth2]
+    Mapbox[🗺️ Mapbox<br/>Mapas]
+    Email[📧 SMTP Server<br/>Notificaciones]
     
     Student -->|HTTPS| WebApp
     Admin -->|HTTPS| WebApp
@@ -132,49 +127,32 @@ graph TB
     API -->|SMTP| Email
     API -->|S3 API| S3
     
-    style Student fill:#4CAF50
-    style Admin fill:#2196F3
-    style WebApp fill:#61DAFB
-    style Gateway fill:#6DB33F
-    style API fill:#6DB33F
-    style DB fill:#336791
-    style Redis fill:#DC382D
-    style S3 fill:#FF9900
-    style Auth0 fill:#EB5424
-    style Google fill:#4285F4
-    style Mapbox fill:#000000
-    style Email fill:#EA4335
+    style Student fill:#4CAF50,color:#fff
+    style Admin fill:#2196F3,color:#fff
+    style WebApp fill:#61DAFB,color:#000
+    style Gateway fill:#6DB33F,color:#fff
+    style API fill:#6DB33F,color:#fff
+    style DB fill:#336791,color:#fff
+    style Redis fill:#DC382D,color:#fff
+    style S3 fill:#FF9900,color:#fff
+    style Auth0 fill:#EB5424,color:#fff
+    style Google fill:#4285F4,color:#fff
+    style Mapbox fill:#000000,color:#fff
+    style Email fill:#EA4335,color:#fff
 ```
 
 ### Diagrama de Contenedores (C4 Nivel 2)
 
 ```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        Web[🌐 Next.js Web App<br/>Port: 3000<br/>SSR/SSG]
-    end
-    
-    subgraph "API Gateway Layer"
-        Gateway[🚪 Spring Cloud Gateway<br/>Port: 8080<br/>Rate Limiting<br/>JWT Validation]
-    end
-    
-    subgraph "Backend Layer"
-        API[⚙️ Spring Boot API<br/>Port: 8080<br/>REST Services<br/>Business Logic]
-    end
-    
-    subgraph "Data Layer"
-        PostgreSQL[(🗄️ PostgreSQL 16<br/>Port: 5432<br/>Primary Database)]
-        Redis[(⚡ Redis 7<br/>Port: 6379<br/>Cache & Rate Limiting)]
-    end
-    
-    subgraph "Storage Layer"
-        S3[☁️ AWS S3<br/>Reportes<br/>CSV/PDF]
-    end
-    
-    subgraph "External Services"
-        Auth0[🔐 Auth0<br/>OAuth2]
-        Mapbox[🗺️ Mapbox<br/>Maps API]
-    end
+graph TD
+    Web[🌐 Next.js Web App<br/>Port: 3000<br/>SSR/SSG]
+    Gateway[🚪 Spring Cloud Gateway<br/>Port: 8080<br/>Rate Limiting<br/>JWT Validation]
+    API[⚙️ Spring Boot API<br/>Port: 8080<br/>REST Services<br/>Business Logic]
+    PostgreSQL[(🗄️ PostgreSQL 16<br/>Port: 5432<br/>Primary Database)]
+    Redis[(⚡ Redis 7<br/>Port: 6379<br/>Cache & Rate Limiting)]
+    S3[☁️ AWS S3<br/>Reportes<br/>CSV/PDF]
+    Auth0[🔐 Auth0<br/>OAuth2]
+    Mapbox[🗺️ Mapbox<br/>Maps API]
     
     Web -->|HTTPS| Gateway
     Web -->|HTTPS| Auth0
@@ -199,48 +177,34 @@ graph TB
 ### Diagrama de Componentes (C4 Nivel 3)
 
 ```mermaid
-graph TB
-    subgraph "API Gateway Components"
-        GatewayRouter[Route Handler]
-        JWTFilter[JWT Authentication Filter]
-        RateLimiter[Rate Limiting Filter]
-        Auth0Filter[Auth0 User Auto-Create]
-    end
-    
-    subgraph "Backend API Components"
-        AuthController[Auth Controller<br/>Login/Register/Refresh]
-        CalcController[Calc Controller<br/>Carbon Calculations]
-        StatsController[Stats Controller<br/>Statistics & Analytics]
-        GamificationController[Gamification Controller<br/>XP/Missions/Leaderboard]
-        AdminController[Admin Controller<br/>User Management]
-        ReportsController[Reports Controller<br/>CSV/PDF Export]
-        FactorsController[Factors Controller<br/>Emission Factors]
-    end
-    
-    subgraph "Services Layer"
-        AuthService[Auth Service<br/>JWT/Auth0/OAuth2]
-        CalcService[Calc Service<br/>Emission Calculations]
-        StatsService[Stats Service<br/>Aggregations]
-        GamificationService[Gamification Service<br/>XP/Missions Logic]
-        MissionService[Mission Service<br/>Mission Management]
-        LeaderboardService[Leaderboard Service<br/>Rankings]
-        AdminService[Admin Service<br/>User CRUD]
-        ReportsService[Reports Service<br/>Report Generation]
-        EmailService[Email Service<br/>Notifications]
-    end
-    
-    subgraph "Data Access Layer"
-        UserRepository[User Repository]
-        CalcRepository[Calculation Repository]
-        GamificationRepository[Gamification Repository]
-        MissionRepository[Mission Repository]
-        LeaderboardCacheRepository[Leaderboard Cache]
-        FactorsRepository[Factors Repository]
-    end
-    
-    subgraph "Database"
-        PostgreSQL[(PostgreSQL)]
-    end
+graph TD
+    GatewayRouter[Route Handler]
+    JWTFilter[JWT Authentication Filter]
+    RateLimiter[Rate Limiting Filter]
+    Auth0Filter[Auth0 User Auto-Create]
+    AuthController[Auth Controller<br/>Login/Register/Refresh]
+    CalcController[Calc Controller<br/>Carbon Calculations]
+    StatsController[Stats Controller<br/>Statistics & Analytics]
+    GamificationController[Gamification Controller<br/>XP/Missions/Leaderboard]
+    AdminController[Admin Controller<br/>User Management]
+    ReportsController[Reports Controller<br/>CSV/PDF Export]
+    FactorsController[Factors Controller<br/>Emission Factors]
+    AuthService[Auth Service<br/>JWT/Auth0/OAuth2]
+    CalcService[Calc Service<br/>Emission Calculations]
+    StatsService[Stats Service<br/>Aggregations]
+    GamificationService[Gamification Service<br/>XP/Missions Logic]
+    MissionService[Mission Service<br/>Mission Management]
+    LeaderboardService[Leaderboard Service<br/>Rankings]
+    AdminService[Admin Service<br/>User CRUD]
+    ReportsService[Reports Service<br/>Report Generation]
+    EmailService[Email Service<br/>Notifications]
+    UserRepository[User Repository]
+    CalcRepository[Calculation Repository]
+    GamificationRepository[Gamification Repository]
+    MissionRepository[Mission Repository]
+    LeaderboardCacheRepository[Leaderboard Cache]
+    FactorsRepository[Factors Repository]
+    PostgreSQL[(PostgreSQL)]
     
     GatewayRouter --> JWTFilter
     GatewayRouter --> RateLimiter
@@ -292,76 +256,31 @@ graph TB
 ### Arquitectura de Despliegue AWS EKS
 
 ```mermaid
-graph TB
-    subgraph "Internet"
-        Users[👥 Usuarios]
-    end
-    
-    subgraph "AWS Cloud"
-        subgraph "Route 53"
-            DNS[🌐 ecoestudiante.com]
-        end
-        
-        subgraph "CloudFront"
-            CDN[☁️ CDN<br/>Static Assets]
-        end
-        
-        subgraph "Application Load Balancer"
-            ALB[⚖️ ALB<br/>SSL Termination<br/>Health Checks]
-        end
-        
-        subgraph "EKS Cluster"
-            subgraph "Ingress Controller"
-                Ingress[🚪 NGINX Ingress<br/>TLS/SSL<br/>Rate Limiting]
-            end
-            
-            subgraph "Web Namespace"
-                WebPod1[🌐 Web Pod 1]
-                WebPod2[🌐 Web Pod 2]
-                WebPod3[🌐 Web Pod 3]
-                WebService[Web Service<br/>ClusterIP]
-            end
-            
-            subgraph "Gateway Namespace"
-                GatewayPod1[🚪 Gateway Pod 1]
-                GatewayPod2[🚪 Gateway Pod 2]
-                GatewayService[Gateway Service<br/>ClusterIP]
-            end
-            
-            subgraph "API Namespace"
-                APIPod1[⚙️ API Pod 1]
-                APIPod2[⚙️ API Pod 2]
-                APIService[API Service<br/>ClusterIP]
-            end
-            
-            subgraph "Redis Namespace"
-                RedisPod[⚡ Redis Pod<br/>StatefulSet]
-                RedisService[Redis Service<br/>ClusterIP]
-            end
-        end
-        
-        subgraph "RDS"
-            RDS[(🗄️ PostgreSQL<br/>Multi-AZ<br/>Automated Backups)]
-        end
-        
-        subgraph "ElastiCache"
-            ElastiCache[(⚡ Redis Cluster<br/>High Availability)]
-        end
-        
-        subgraph "S3"
-            S3Bucket[☁️ S3 Bucket<br/>Reports Storage<br/>Versioning Enabled]
-        end
-        
-        subgraph "CloudWatch"
-            Logs[📊 CloudWatch Logs]
-            Metrics[📈 CloudWatch Metrics]
-            Alarms[🚨 CloudWatch Alarms]
-        end
-        
-        subgraph "IAM"
-            Roles[🔐 IAM Roles<br/>Service Accounts]
-        end
-    end
+graph TD
+    Users[👥 Usuarios]
+    DNS[🌐 Route 53<br/>DNS ecoestudiante.com]
+    CDN[☁️ CloudFront<br/>CDN Static Assets]
+    ALB[⚖️ Application Load Balancer<br/>SSL Termination<br/>Health Checks]
+    Ingress[🚪 NGINX Ingress Controller<br/>TLS/SSL<br/>Rate Limiting]
+    WebService[Web Service<br/>ClusterIP]
+    WebPod1[🌐 Web Pod 1]
+    WebPod2[🌐 Web Pod 2]
+    WebPod3[🌐 Web Pod 3]
+    GatewayService[Gateway Service<br/>ClusterIP]
+    GatewayPod1[🚪 Gateway Pod 1]
+    GatewayPod2[🚪 Gateway Pod 2]
+    APIService[API Service<br/>ClusterIP]
+    APIPod1[⚙️ API Pod 1]
+    APIPod2[⚙️ API Pod 2]
+    RedisService[Redis Service<br/>ClusterIP]
+    RedisPod[⚡ Redis Pod<br/>StatefulSet]
+    RDS[(🗄️ RDS PostgreSQL<br/>Multi-AZ<br/>Automated Backups)]
+    ElastiCache[(⚡ ElastiCache Redis<br/>High Availability)]
+    S3Bucket[☁️ S3 Bucket<br/>Reports Storage<br/>Versioning Enabled]
+    Logs[📊 CloudWatch Logs]
+    Metrics[📈 CloudWatch Metrics]
+    Alarms[🚨 CloudWatch Alarms]
+    Roles[🔐 IAM Roles<br/>Service Accounts]
     
     Users -->|HTTPS| DNS
     DNS --> CDN
@@ -401,12 +320,19 @@ graph TB
     style ALB fill:#FF9900,color:#fff
     style Ingress fill:#00A86B,color:#fff
     style WebPod1 fill:#000000,color:#fff
+    style WebPod2 fill:#000000,color:#fff
+    style WebPod3 fill:#000000,color:#fff
     style GatewayPod1 fill:#6DB33F,color:#fff
+    style GatewayPod2 fill:#6DB33F,color:#fff
     style APIPod1 fill:#6DB33F,color:#fff
+    style APIPod2 fill:#6DB33F,color:#fff
     style RDS fill:#336791,color:#fff
     style ElastiCache fill:#DC382D,color:#fff
     style S3Bucket fill:#FF9900,color:#fff
     style Logs fill:#FF4F8B,color:#fff
+    style Metrics fill:#FF4F8B,color:#fff
+    style Alarms fill:#FF4F8B,color:#fff
+    style Roles fill:#FF9900,color:#fff
 ```
 
 ---
@@ -1638,6 +1564,105 @@ Este proyecto utiliza las siguientes dependencias de código abierto y sus respe
 - **PostgreSQL License**: Base de datos PostgreSQL (similar a MIT/BSD)
 
 Todas las dependencias utilizadas son compatibles con el uso propietario del proyecto.
+
+---
+
+## 🚀 Roadmap: Tecnologías Planificadas para Producción
+
+Este MVP (Minimum Viable Product) incluye las funcionalidades core y tecnologías esenciales para desarrollo y pruebas locales. Las siguientes tecnologías están planificadas para implementación en el paso a producción en AWS con Kubernetes:
+
+### Infraestructura Cloud (AWS)
+
+| Tecnología | Propósito | Prioridad | Fase |
+|------------|-----------|-----------|------|
+| **AWS EKS** | Kubernetes gestionado | Alta | Producción |
+| **AWS RDS PostgreSQL** | Base de datos gestionada Multi-AZ | Alta | Producción |
+| **AWS ElastiCache Redis** | Cache y rate limiting de alta disponibilidad | Alta | Producción |
+| **AWS S3** | Almacenamiento de reportes CSV/PDF | Media | Producción |
+| **AWS CloudWatch** | Logs, métricas y alertas centralizadas | Alta | Producción |
+| **AWS IAM** | Gestión de identidades y permisos | Alta | Producción |
+| **AWS ALB** | Application Load Balancer con SSL | Alta | Producción |
+| **AWS Route 53** | DNS gestionado | Media | Producción |
+| **AWS CloudFront** | CDN para assets estáticos | Baja | Post-Producción |
+
+### Orquestación y Despliegue
+
+| Tecnología | Propósito | Prioridad | Fase |
+|------------|-----------|-----------|------|
+| **Kubernetes** | Orquestación de contenedores | Alta | Producción |
+| **Helm Charts** | Gestión de despliegues K8s | Alta | Producción |
+| **NGINX Ingress Controller** | Ingress para K8s con TLS | Alta | Producción |
+| **Horizontal Pod Autoscaler (HPA)** | Auto-escalado basado en métricas | Media | Producción |
+| **Vertical Pod Autoscaler (VPA)** | Optimización de recursos | Baja | Post-Producción |
+
+### Monitoreo y Observabilidad
+
+| Tecnología | Propósito | Prioridad | Fase |
+|------------|-----------|-----------|------|
+| **Grafana** | Dashboards de visualización de métricas | Alta | Producción |
+| **Prometheus Operator** | Gestión de Prometheus en K8s | Alta | Producción |
+| **AWS CloudWatch Dashboards** | Dashboards personalizados | Media | Producción |
+| **ELK Stack / OpenSearch** | Agregación y búsqueda de logs | Media | Post-Producción |
+| **Jaeger / AWS X-Ray** | Distributed tracing | Baja | Post-Producción |
+
+### Pruebas y Calidad
+
+| Tecnología | Propósito | Prioridad | Fase |
+|------------|-----------|-----------|------|
+| **k6** | Pruebas de carga y estrés | Media | Pre-Producción |
+| **Cypress / Playwright** | Pruebas E2E automatizadas | Media | Pre-Producción |
+| **GitHub Actions / GitLab CI** | Pipeline CI/CD completo | Alta | Producción |
+| **SonarQube** | Análisis de calidad de código | Media | Pre-Producción |
+
+### Seguridad
+
+| Tecnología | Propósito | Prioridad | Fase |
+|------------|-----------|-----------|------|
+| **CodeQL (SAST)** | Análisis estático de código | Alta | Pre-Producción |
+| **OWASP ZAP (DAST)** | Análisis dinámico de seguridad | Alta | Pre-Producción |
+| **Snyk / Dependabot** | Escaneo de vulnerabilidades en dependencias | Alta | Pre-Producción |
+| **Argon2** | Hashing de contraseñas (alternativa a BCrypt) | Baja | Post-Producción |
+| **AWS WAF** | Web Application Firewall | Media | Producción |
+| **AWS Secrets Manager** | Gestión segura de secretos | Alta | Producción |
+| **Cert-Manager** | Gestión automática de certificados TLS | Alta | Producción |
+
+### Herramientas de Desarrollo
+
+| Tecnología | Propósito | Prioridad | Fase |
+|------------|-----------|-----------|------|
+| **Prettier** | Formateo automático de código | Media | Desarrollo |
+| **Husky** | Git hooks para calidad de código | Media | Desarrollo |
+| **Commitlint** | Validación de mensajes de commit | Baja | Desarrollo |
+
+### Notas Importantes
+
+- **Prioridad Alta**: Tecnologías críticas para el despliegue en producción
+- **Prioridad Media**: Tecnologías importantes pero no bloqueantes
+- **Prioridad Baja**: Mejoras y optimizaciones futuras
+
+- **Fase Pre-Producción**: Implementación antes del despliegue a producción
+- **Fase Producción**: Implementación durante el despliegue inicial
+- **Fase Post-Producción**: Mejoras continuas después del lanzamiento
+
+### Estado Actual del MVP
+
+✅ **Implementado y Funcional**:
+- Desarrollo local con Docker Compose
+- Backend Spring Boot con todas las funcionalidades core
+- Frontend Next.js con UI completa
+- Autenticación JWT y Auth0
+- Base de datos PostgreSQL con Flyway
+- Redis para rate limiting
+- Pruebas unitarias e integración (JUnit, Jest, Pact)
+- Documentación API (Swagger/OpenAPI)
+- Métricas básicas (Micrometer/Prometheus)
+
+⚠️ **Planificado para Producción**:
+- Todas las tecnologías listadas en las tablas anteriores
+- Infraestructura completa en AWS
+- Monitoreo y observabilidad avanzada
+- Pipeline CI/CD completo
+- Seguridad reforzada
 
 ---
 
