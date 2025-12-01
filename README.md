@@ -1135,10 +1135,31 @@ kubectl exec -it <pod-name> -n ecoestudiante -- curl http://ecoestudiante-api:80
    # Configurar application.yml con credenciales de BD
    # Editar src/main/resources/application.yml
    
+   # ⚠️ IMPORTANTE: Configuración de Puerto
+   # Si el puerto 8080 está ocupado en local, se recomienda usar el puerto 18080
+   # Editar src/main/resources/application.yml o application.properties:
+   #   server.port=18080
+   # O establecer variable de entorno:
+   #   export SERVER_PORT=18080
+   
    # Compilar y ejecutar
    mvn clean install
    mvn spring-boot:run
    ```
+   
+   **Nota sobre puertos:**
+   - **Puerto por defecto**: 8080
+   - **Puerto alternativo recomendado**: 18080 (si 8080 está ocupado)
+   - Para cambiar el puerto, edita `src/main/resources/application.yml`:
+     ```yaml
+     server:
+       port: 18080  # Cambiar a 18080 si 8080 está ocupado
+     ```
+   - O usa variable de entorno:
+     ```bash
+     export SERVER_PORT=18080
+     mvn spring-boot:run
+     ```
 
 4. **Configurar Gateway**
 
@@ -1148,10 +1169,19 @@ kubectl exec -it <pod-name> -n ecoestudiante -- curl http://ecoestudiante-api:80
    # Configurar application.yml
    # Editar src/main/resources/application.yml
    
+   # ⚠️ IMPORTANTE: Si el Backend API está en puerto 18080, actualiza la URL:
+   # En application.yml, configura:
+   #   BACKEND_API_URL: http://localhost:18080
+   # (Por defecto el Gateway espera el backend en 8080)
+   
    # Compilar y ejecutar
    mvn clean install
    mvn spring-boot:run
    ```
+   
+   **Nota sobre configuración del Gateway:**
+   - Si cambiaste el puerto del Backend API a 18080, asegúrate de actualizar la URL del backend en la configuración del Gateway
+   - El Gateway debe apuntar al puerto correcto donde está corriendo el Backend API
 
 5. **Configurar Frontend**
 
@@ -1176,6 +1206,55 @@ kubectl exec -it <pod-name> -n ecoestudiante -- curl http://ecoestudiante-api:80
 ---
 
 ## ⚙️ Configuración
+
+### Configuración de Puertos
+
+#### Backend API
+
+**Puerto por defecto**: `8080`
+
+**Si el puerto 8080 está ocupado**, se recomienda usar el puerto `18080`:
+
+**Opción 1: Archivo de configuración**
+```yaml
+# src/main/resources/application.yml
+server:
+  port: 18080
+```
+
+**Opción 2: Variable de entorno**
+```bash
+export SERVER_PORT=18080
+mvn spring-boot:run
+```
+
+**Opción 3: Línea de comandos**
+```bash
+mvn spring-boot:run -Dserver.port=18080
+```
+
+**⚠️ Importante**: Si cambias el puerto del Backend API a `18080`, asegúrate de actualizar la configuración del Gateway para que apunte al puerto correcto:
+
+```yaml
+# ecoestudiante-gateway/src/main/resources/application.yml
+BACKEND_API_URL: http://localhost:18080
+```
+
+#### Gateway
+
+**Puerto por defecto**: `8080`
+
+El Gateway puede usar el mismo puerto 8080 si el Backend API está en 18080, o puedes configurarlo en otro puerto si es necesario.
+
+#### Frontend
+
+**Puerto por defecto**: `3000`
+
+Si necesitas cambiar el puerto del frontend:
+```bash
+# En ecoestudiante-web
+PORT=3001 npm run dev
+```
 
 ### Variables de Entorno
 
