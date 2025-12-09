@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import Navbar from '@/components/Navbar';
@@ -18,7 +17,6 @@ type AuthResponse = {
 };
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,10 +43,11 @@ export default function AdminLoginPage() {
         hasRefreshToken: !!response.refreshToken
       });
 
-      // Verificar si el usuario es realmente admin
-      if (!response.role || response.role !== 'ADMIN') {
-        console.error('[Admin Login] Usuario no es ADMIN:', response.role);
-        setError(`No tienes permisos de administrador. Tu rol actual es: ${response.role || 'sin rol'}. Contacta al soporte si crees que esto es un error.`);
+      // Verificar si el usuario tiene rol de admin, super admin o profesor
+      const allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'PROFESOR'];
+      if (!response.role || !allowedRoles.includes(response.role)) {
+        console.error('[Admin Login] Usuario no tiene rol autorizado:', response.role);
+        setError(`No tienes permisos de administrador. Tu rol actual es: ${response.role || 'sin rol'}. Solo ${allowedRoles.join(', ')} pueden acceder. Contacta al soporte si crees que esto es un error.`);
         return;
       }
 
@@ -62,13 +61,22 @@ export default function AdminLoginPage() {
       localStorage.setItem('userRole', response.role);
       localStorage.setItem('isAdmin', 'true');
 
-      console.log('[Admin Login] Datos guardados en localStorage');
+      console.log('[Admin Login] Datos guardados en localStorage:', {
+        hasToken: !!localStorage.getItem('authToken'),
+        hasRefreshToken: !!localStorage.getItem('refreshToken'),
+        role: localStorage.getItem('userRole')
+      });
       console.log('[Admin Login] Redirigiendo a /admin/dashboard...');
 
-      // Redirigir al dashboard de administración
-      await router.push('/admin/dashboard');
+      // SOLUCIÓN: Usar window.location.href en lugar de router.push
+      // Esto garantiza que localStorage esté completamente sincronizado antes
+      // de que la nueva página intente leer los tokens.
+      // router.push puede causar timing issues donde el nuevo componente
+      // se monta antes de que localStorage esté listo.
+      window.location.href = '/admin/dashboard';
 
-      console.log('[Admin Login] Redirección completada');
+      // Nota: No hay console.log después porque window.location.href
+      // causa una recarga completa de la página
     } catch (e) {
       console.error('[Admin Login] Error completo:', e);
       const errorMessage = e instanceof Error ? e.message : 'Error al iniciar sesión';
@@ -212,7 +220,7 @@ export default function AdminLoginPage() {
                 Acceso exclusivo para administradores
               </p>
               <p className="text-xs text-blue-800">
-                Solo personal autorizado puede acceder al panel de administración.
+                Solo Super Administradores, Administradores y Profesores pueden acceder al panel de administración.
               </p>
             </div>
 
@@ -230,5 +238,9 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
+
+
+
 
 

@@ -29,7 +29,6 @@ interface FiltersPanelProps {
   onDayChange: (value: number | '') => void;
 
   // Actions
-  onUpdate: () => void;
   onClear: () => void;
   loading?: boolean;
 }
@@ -83,16 +82,30 @@ export default function FiltersPanel({
   onMonthChange,
   day,
   onDayChange,
-  onUpdate,
   onClear,
   loading = false,
 }: FiltersPanelProps) {
   return (
     <Card className="mb-8 shadow-lg border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50">
       <CardHeader className="pb-3 pt-4 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50">
-        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2 drop-shadow-sm">
-          🔍 Filtros de Análisis
-        </h3>
+        <div className="flex items-center justify-between w-full">
+          <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2 drop-shadow-sm">
+            🔍 Filtros de Análisis
+          </h3>
+
+          {/* Badge de estado - Indica carga automática */}
+          {loading ? (
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold animate-pulse">
+              <div className="animate-spin h-3 w-3 border-2 border-emerald-600 border-t-transparent rounded-full"></div>
+              <span>Actualizando...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+              <span>✓</span>
+              <span>Sincronizado</span>
+            </div>
+          )}
+        </div>
       </CardHeader>
 
       <CardBody className="gap-6 p-6">
@@ -100,15 +113,17 @@ export default function FiltersPanel({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
           {/* Filter 1: Agrupar por */}
-          <div className="filter-dropdown-1 min-h-[80px] flex items-start">
+          <div className="filter-dropdown-1 min-h-[80px] flex flex-col">
             <Select
               label="Agrupar por"
+              labelPlacement="outside"
               selectedKeys={[groupBy]}
               onChange={(e) => onGroupByChange(e.target.value as 'month' | 'day')}
               classNames={{
                 base: "w-full",
-                trigger: "min-h-[56px] py-2 px-3",
-                value: "text-sm pr-8 truncate",
+                label: "text-sm font-semibold text-slate-700 mb-1.5",
+                trigger: "min-h-[48px] py-2 px-3",
+                value: "text-sm font-medium text-slate-800",
                 innerWrapper: "pr-2",
               }}
             >
@@ -122,15 +137,17 @@ export default function FiltersPanel({
           </div>
 
           {/* Filter 2: Período */}
-          <div className="filter-dropdown-2 min-h-[80px] flex items-start">
+          <div className="filter-dropdown-2 min-h-[80px] flex flex-col">
             <Select
               label="Período (meses)"
+              labelPlacement="outside"
               selectedKeys={[String(months)]}
               onChange={(e) => onMonthsChange(Number(e.target.value))}
               classNames={{
                 base: "w-full",
-                trigger: "min-h-[56px] py-2 px-3",
-                value: "text-sm pr-8 truncate",
+                label: "text-sm font-semibold text-slate-700 mb-1.5",
+                trigger: "min-h-[48px] py-2 px-3",
+                value: "text-sm font-medium text-slate-800",
                 innerWrapper: "pr-2",
               }}
             >
@@ -150,15 +167,17 @@ export default function FiltersPanel({
           </div>
 
           {/* Filter 3: Jornada */}
-          <div className="filter-dropdown-3 min-h-[80px] flex items-start">
+          <div className="filter-dropdown-3 min-h-[80px] flex flex-col">
             <Select
               label="Jornada"
+              labelPlacement="outside"
               selectedKeys={schedule ? [schedule] : []}
               onChange={(e) => onScheduleChange(e.target.value)}
               classNames={{
                 base: "w-full",
-                trigger: "min-h-[56px] py-2 px-3",
-                value: "text-sm pr-8 truncate",
+                label: "text-sm font-semibold text-slate-700 mb-1.5",
+                trigger: "min-h-[48px] py-2 px-3",
+                value: "text-sm font-medium text-slate-800",
                 innerWrapper: "pr-2",
               }}
             >
@@ -175,16 +194,18 @@ export default function FiltersPanel({
           </div>
 
           {/* Filter 4: Carrera */}
-          <div className="filter-dropdown-4 min-h-[80px] flex items-start">
+          <div className="filter-dropdown-4 min-h-[80px] flex flex-col">
             <Select
               label="Carrera"
+              labelPlacement="outside"
               selectedKeys={career ? [career] : []}
               onChange={(e) => onCareerChange(e.target.value)}
               items={[{ value: '', label: 'Todas' }, ...availableCareers.map(c => ({ value: c, label: c }))]}
               classNames={{
                 base: "w-full",
-                trigger: "min-h-[56px] py-2 px-3",
-                value: "text-sm pr-8 truncate",
+                label: "text-sm font-semibold text-slate-700 mb-1.5",
+                trigger: "min-h-[48px] py-2 px-3",
+                value: "text-sm font-medium text-slate-800",
                 innerWrapper: "pr-2",
               }}
             >
@@ -201,9 +222,10 @@ export default function FiltersPanel({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* Filter 5: Mes del Año */}
-          <div className="filter-dropdown-5 min-h-[80px] flex items-start">
+          <div className="filter-dropdown-5 min-h-[80px] flex flex-col">
             <Select
               label="Mes del Año"
+              labelPlacement="outside"
               selectedKeys={month !== '' ? [String(month)] : []}
               onChange={(e) =>
                 onMonthChange(e.target.value ? Number(e.target.value) : '')
@@ -211,8 +233,9 @@ export default function FiltersPanel({
               items={[{ value: '', label: 'Todos los meses' }, ...MONTHS]}
               classNames={{
                 base: "w-full",
-                trigger: "min-h-[56px] py-2 px-3",
-                value: "text-sm pr-8 truncate",
+                label: "text-sm font-semibold text-slate-700 mb-1.5",
+                trigger: "min-h-[48px] py-2 px-3",
+                value: "text-sm font-medium text-slate-800",
                 innerWrapper: "pr-2",
               }}
             >
@@ -225,16 +248,18 @@ export default function FiltersPanel({
           </div>
 
           {/* Filter 6: Día del Mes */}
-          <div className="filter-dropdown-6 min-h-[80px] flex items-start">
+          <div className="filter-dropdown-6 min-h-[80px] flex flex-col">
             <Select
               label="Día del Mes"
+              labelPlacement="outside"
               selectedKeys={day !== '' ? [String(day)] : []}
               onChange={(e) => onDayChange(e.target.value ? Number(e.target.value) : '')}
               items={[{ value: '', label: 'Todos los días' }, ...DAYS]}
               classNames={{
                 base: "w-full",
-                trigger: "min-h-[56px] py-2 px-3",
-                value: "text-sm pr-8 truncate",
+                label: "text-sm font-semibold text-slate-700 mb-1.5",
+                trigger: "min-h-[48px] py-2 px-3",
+                value: "text-sm font-medium text-slate-800",
                 innerWrapper: "pr-2",
               }}
             >
@@ -250,17 +275,6 @@ export default function FiltersPanel({
         {/* Actions */}
         <div className="flex items-center gap-4 pt-4 border-t-2 border-gray-200 mt-2">
           <Button
-            color="success"
-            variant="solid"
-            onPress={onUpdate}
-            isLoading={loading}
-            startContent={!loading && <span className="text-lg">🔄</span>}
-            className="font-bold text-base h-12 px-6 shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400"
-          >
-            {loading ? 'Cargando...' : 'Actualizar'}
-          </Button>
-
-          <Button
             color="default"
             variant="bordered"
             onPress={onClear}
@@ -270,8 +284,16 @@ export default function FiltersPanel({
             Limpiar Filtros
           </Button>
 
+          {/* Indicador de carga inline para mobile */}
+          {loading && (
+            <div className="flex items-center gap-2 text-emerald-600 font-medium md:hidden">
+              <div className="animate-spin h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full"></div>
+              <span className="text-sm">Actualizando...</span>
+            </div>
+          )}
+
           <div className="ml-auto text-sm text-slate-600 font-medium hidden md:block">
-            💡 Tip: Selecciona múltiples filtros para análisis detallado
+            💡 Tip: Los gráficos se actualizan automáticamente al cambiar filtros
           </div>
         </div>
       </CardBody>

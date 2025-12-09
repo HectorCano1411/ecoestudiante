@@ -20,9 +20,28 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
     method: init?.method || 'GET'
   });
 
+  // Construir headers - preservar Authorization si existe
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  // Agregar headers del init, preservando Authorization
+  if (init?.headers) {
+    const initHeaders = init.headers as Record<string, string>;
+    Object.keys(initHeaders).forEach(key => {
+      headers[key] = initHeaders[key];
+    });
+  }
+
+  logger.debug('api-server', 'Request headers', {
+    hasAuthorization: !!headers['Authorization'],
+    authorizationPrefix: headers['Authorization']?.substring(0, 20),
+    allHeaders: Object.keys(headers),
+  });
+
   const res = await fetch(url, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: headers as HeadersInit,
   });
 
   const clone = res.clone();
@@ -34,18 +53,48 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
   if (!res.ok) {
     // Intentar extraer el mensaje de error del body
     let errorMessage = `${res.status}: ${res.statusText}`;
+    let errorDetails: any = null;
+    let errorCode: string | null = null;
+    
     try {
       const errorBody = await res.clone().json();
+      logger.debug('api-server', 'Error body recibido', errorBody);
+      
       // El ErrorResponse tiene estructura: { error: { code, message, correlationId, details } }
-      if (errorBody.error && errorBody.error.message) {
-        errorMessage = errorBody.error.message;
-      } else if (errorBody.error && typeof errorBody.error === 'string') {
-        errorMessage = errorBody.error;
+      if (errorBody.error) {
+        // Extraer código de error
+        if (errorBody.error.code) {
+          errorCode = errorBody.error.code;
+        }
+        
+        // Extraer mensaje
+        if (errorBody.error.message) {
+          errorMessage = errorBody.error.message;
+        } else if (typeof errorBody.error === 'string') {
+          errorMessage = errorBody.error;
+        }
+        
+        // Extraer detalles de validación si existen
+        if (errorBody.error.details && Array.isArray(errorBody.error.details)) {
+          errorDetails = errorBody.error.details;
+          // Crear mensaje más descriptivo con los detalles
+          const validationMessages = errorBody.error.details
+            .map((d: any) => {
+              const field = d.field || d.path || 'campo';
+              const msg = d.message || d.defaultMessage || 'error de validación';
+              return `${field}: ${msg}`;
+            })
+            .join('; ');
+          if (validationMessages) {
+            errorMessage = `Error de validación: ${validationMessages}`;
+          }
+        }
       } else if (errorBody.message) {
         errorMessage = errorBody.message;
       } else if (typeof errorBody.error === 'string') {
         errorMessage = errorBody.error;
       } else if (errorBody.code) {
+        errorCode = errorBody.code;
         errorMessage = `${errorBody.code}: ${errorBody.message || 'Unknown error'}`;
       }
     } catch (parseError) {
@@ -64,6 +113,9 @@ export async function backendFetch<T>(path: string, init?: RequestInit): Promise
     const error = new Error(`BACKEND ${res.status}: ${errorMessage}`) as any;
     error.status = res.status;
     error.response = res;
+    error.details = errorDetails;
+    error.code = errorCode;
+    error.error = errorDetails ? { details: errorDetails, code: errorCode } : { code: errorCode };
     throw error;
   }
   return res.json() as Promise<T>;

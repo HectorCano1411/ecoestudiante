@@ -1,5 +1,7 @@
 package com.ecoestudiante.auth;
 
+import com.ecoestudiante.institution.repository.InstitutionRepository;
+import com.ecoestudiante.institution.repository.CampusRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,14 +25,25 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
     private final GoogleOAuth2UserService googleOAuth2UserService;
+    private final InstitutionRepository institutionRepository;
+    private final CampusRepository campusRepository;
     private final SecureRandom random = new SecureRandom();
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, EmailService emailService, GoogleOAuth2UserService googleOAuth2UserService) {
+    public AuthService(
+            UserRepository userRepository, 
+            PasswordEncoder passwordEncoder, 
+            JwtUtil jwtUtil, 
+            EmailService emailService, 
+            GoogleOAuth2UserService googleOAuth2UserService,
+            InstitutionRepository institutionRepository,
+            CampusRepository campusRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
         this.googleOAuth2UserService = googleOAuth2UserService;
+        this.institutionRepository = institutionRepository;
+        this.campusRepository = campusRepository;
     }
 
     private String generateVerificationToken() {
@@ -56,6 +69,26 @@ public class AuthService {
             throw new IllegalArgumentException("Email ya está en uso");
         }
 
+        // Validar que la institución existe
+        var institution = institutionRepository.findById(request.institutionId())
+                .orElseThrow(() -> new IllegalArgumentException("Institución no encontrada"));
+
+        // Validar que el campus existe y pertenece a la institución
+        var campus = campusRepository.findById(request.campusId())
+                .orElseThrow(() -> new IllegalArgumentException("Campus no encontrado"));
+
+        if (!campus.getInstitutionId().equals(request.institutionId())) {
+            throw new IllegalArgumentException("El campus seleccionado no pertenece a la institución seleccionada");
+        }
+
+        if (!campus.isEnabled()) {
+            throw new IllegalArgumentException("El campus seleccionado no está disponible");
+        }
+
+        if (!institution.isEnabled()) {
+            throw new IllegalArgumentException("La institución seleccionada no está disponible");
+        }
+
         // Generar token de verificación
         String verificationToken = generateVerificationToken();
         LocalDateTime tokenExpiry = LocalDateTime.now().plusHours(VERIFICATION_TOKEN_EXPIRY_HOURS);
@@ -67,6 +100,8 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setCarrera(request.carrera());
         user.setJornada(request.jornada());
+        user.setInstitutionId(request.institutionId());
+        user.setCampusId(request.campusId());
         user.setEnabled(true);
         user.setEmailVerified(false);
         user.setVerificationToken(verificationToken);
@@ -217,11 +252,17 @@ public class AuthService {
             throw new IllegalArgumentException("La contraseña ingresada es incorrecta. Por favor intenta nuevamente.");
         }
 
-        logger.info("Login exitoso - Username: {}, UserId: {}, Role: {}", user.getUsername(), user.getId(), user.getRole());
+        // Normalizar el rol a mayúsculas para consistencia
+        String userRole = (user.getRole() != null && !user.getRole().isBlank()) 
+            ? user.getRole().toUpperCase().trim() 
+            : "ESTUDIANTE";
+        
+        logger.info("Login exitoso - Username: {}, UserId: {}, Role: {} (normalizado: {})", 
+                   user.getUsername(), user.getId(), user.getRole(), userRole);
 
-        // Generar tokens JWT (access token y refresh token) con rol
-        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), user.getRole());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), user.getRole());
+        // Generar tokens JWT (access token y refresh token) con rol normalizado
+        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), userRole);
+        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), userRole);
 
         return new AuthDtos.AuthResponse(
             accessToken,
@@ -230,7 +271,7 @@ public class AuthService {
             user.getId().toString(),
             user.getEmail(),
             refreshToken,
-            user.getRole()  // Incluir rol en la respuesta
+            userRole  // Incluir rol normalizado en la respuesta
         );
     }
 
@@ -255,11 +296,17 @@ public class AuthService {
             throw new IllegalArgumentException("Usuario deshabilitado");
         }
 
-        // Generar nuevos tokens con rol
-        String newAccessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), user.getRole());
-        String newRefreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), user.getRole());
+        // Normalizar el rol a mayúsculas para consistencia
+        String userRole = (user.getRole() != null && !user.getRole().isBlank()) 
+            ? user.getRole().toUpperCase().trim() 
+            : "ESTUDIANTE";
+        
+        // Generar nuevos tokens con rol normalizado
+        String newAccessToken = jwtUtil.generateToken(user.getUsername(), user.getId().toString(), userRole);
+        String newRefreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId().toString(), userRole);
 
-        logger.info("Tokens renovados exitosamente - Username: {}, Role: {}", user.getUsername(), user.getRole());
+        logger.info("Tokens renovados exitosamente - Username: {}, Role: {} (normalizado: {})", 
+                   user.getUsername(), user.getRole(), userRole);
 
         return new AuthDtos.AuthResponse(
             newAccessToken,
@@ -268,7 +315,7 @@ public class AuthService {
             user.getId().toString(),
             user.getEmail(),
             newRefreshToken,
-            user.getRole()  // Incluir rol en la respuesta
+            userRole  // Incluir rol normalizado en la respuesta
         );
     }
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // useRouter is not used in this component but may be needed in the future
 // import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +10,20 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import UniversityCarousel from "@/components/UniversityCarousel";
 import { validatePassword } from "@/utils/passwordValidator";
+
+interface Institution {
+  id: string;
+  name: string;
+  type: string;
+  code: string | null;
+}
+
+interface Campus {
+  id: string;
+  name: string;
+  code: string | null;
+  institutionId: string;
+}
 
 type RegisterResponse = {
   message: string;
@@ -55,6 +69,65 @@ export default function RegisterPage() {
   const [emailSent, setEmailSent] = useState(false);
   const [passwordValidation, setPasswordValidation] = useState<{ isValid: boolean; errors: string[]; strength: 'weak' | 'medium' | 'strong' } | null>(null);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [institutionId, setInstitutionId] = useState("");
+  const [campusId, setCampusId] = useState("");
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+  const [loadingCampuses, setLoadingCampuses] = useState(false);
+
+  // Cargar instituciones al montar el componente
+  useEffect(() => {
+    loadInstitutions();
+  }, []);
+
+  // Cargar campus cuando se selecciona una institución
+  useEffect(() => {
+    if (institutionId) {
+      loadCampuses(institutionId);
+      // Limpiar campus seleccionado si cambia la institución
+      setCampusId("");
+    } else {
+      setCampuses([]);
+      setCampusId("");
+    }
+  }, [institutionId]);
+
+  const loadInstitutions = async () => {
+    try {
+      setLoadingInstitutions(true);
+      // SOLUCIÓN: Consultar directamente al backend ya que /api/institutions devuelve 404
+      const response = await fetch("http://localhost:18080/api/v1/institutions?enabled=true&page=0&size=100");
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setInstitutions(data.institutions || []);
+    } catch (err: any) {
+      console.error("Error al cargar instituciones:", err);
+      setError("Error al cargar instituciones. Por favor, recarga la página.");
+    } finally {
+      setLoadingInstitutions(false);
+    }
+  };
+
+  const loadCampuses = async (instId: string) => {
+    try {
+      setLoadingCampuses(true);
+      // SOLUCIÓN: Consultar directamente al backend ya que /api/institutions/campuses devuelve 404
+      const response = await fetch(`http://localhost:18080/api/v1/institutions/campuses?institutionId=${instId}&enabled=true&page=0&size=100`);
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setCampuses(data.campuses || []);
+    } catch (err: any) {
+      console.error("Error al cargar campus:", err);
+      setCampuses([]);
+    } finally {
+      setLoadingCampuses(false);
+    }
+  };
 
   async function doRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -83,6 +156,19 @@ export default function RegisterPage() {
       return;
     }
 
+    // Validar institución y campus
+    if (!institutionId) {
+      setError("Debes seleccionar una institución educativa");
+      setLoading(false);
+      return;
+    }
+
+    if (!campusId) {
+      setError("Debes seleccionar un campus/sede");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await api<RegisterResponse>("/auth/register", {
         method: "POST",
@@ -91,7 +177,9 @@ export default function RegisterPage() {
           email, 
           password,
           carrera,
-          jornada
+          jornada,
+          institutionId,
+          campusId
         }),
       });
 
@@ -420,6 +508,66 @@ export default function RegisterPage() {
                       </label>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="institution" className="block text-sm font-medium text-gray-700">
+                    Institución Educativa <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="institution"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                    value={institutionId}
+                    onChange={(e) => setInstitutionId(e.target.value)}
+                    required
+                    disabled={loading || loadingInstitutions}
+                  >
+                    <option value="" className="text-gray-500">
+                      {loadingInstitutions ? "Cargando instituciones..." : "Selecciona tu institución"}
+                    </option>
+                    {institutions.map((inst) => (
+                      <option key={inst.id} value={inst.id} className="text-gray-900">
+                        {inst.name} {inst.type && `(${inst.type})`}
+                      </option>
+                    ))}
+                  </select>
+                  {institutions.length === 0 && !loadingInstitutions && (
+                    <p className="text-xs text-yellow-600">
+                      No hay instituciones disponibles. Contacta al administrador.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="campus" className="block text-sm font-medium text-gray-700">
+                    Campus/Sede <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="campus"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    value={campusId}
+                    onChange={(e) => setCampusId(e.target.value)}
+                    required
+                    disabled={loading || loadingCampuses || !institutionId}
+                  >
+                    <option value="" className="text-gray-500">
+                      {!institutionId 
+                        ? "Primero selecciona una institución"
+                        : loadingCampuses 
+                        ? "Cargando campus..." 
+                        : "Selecciona tu campus/sede"}
+                    </option>
+                    {campuses.map((campus) => (
+                      <option key={campus.id} value={campus.id} className="text-gray-900">
+                        {campus.name}
+                      </option>
+                    ))}
+                  </select>
+                  {institutionId && campuses.length === 0 && !loadingCampuses && (
+                    <p className="text-xs text-yellow-600">
+                      No hay campus disponibles para esta institución. Contacta al administrador.
+                    </p>
+                  )}
                 </div>
 
                 <button

@@ -51,6 +51,10 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 // Error handling
                 .requestMatchers("/error").permitAll()
+                // Instituciones - Permitir acceso público a GET (el controller verifica permisos según parámetros)
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/institutions/**").permitAll()
+                // Campus - Permitir acceso público a GET (el controller verifica permisos según parámetros)
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/institutions/campuses/**").permitAll()
                 // Todas las demás requieren autenticación
                 .anyRequest().authenticated()
             )

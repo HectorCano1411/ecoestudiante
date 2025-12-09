@@ -20,3 +20,9 @@ WHERE email = 'ecoestudiante7@gmail.com';
 -- 1. Cerrar sesión completamente
 -- 2. Iniciar sesión nuevamente para obtener un nuevo token JWT con el rol ADMIN
 -- 3. El token anterior no tendrá el rol actualizado
+
+
+
+
+
+

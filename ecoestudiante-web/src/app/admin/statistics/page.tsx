@@ -59,19 +59,83 @@ interface TimeSeriesStats {
   period: string;
 }
 
+interface Institution {
+  id: string;
+  name: string;
+  type: string;
+}
+
+interface Campus {
+  id: string;
+  name: string;
+  institutionId: string;
+}
+
 export default function AdminStatisticsPage() {
   const [careerStats, setCareerStats] = useState<CareerStats[]>([]);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [viewMode, setViewMode] = useState<'charts' | 'tables'>('charts');
+  const [institutionFilter, setInstitutionFilter] = useState<string>('');
+  const [campusFilter, setCampusFilter] = useState<string>('');
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+  const [loadingCampuses, setLoadingCampuses] = useState(false);
+
+  // Cargar instituciones al montar
+  useEffect(() => {
+    loadInstitutions();
+  }, []);
+
+  // Cargar campus cuando se selecciona una institución
+  useEffect(() => {
+    if (institutionFilter) {
+      loadCampusesForFilter(institutionFilter);
+      setCampusFilter(''); // Limpiar campus al cambiar institución
+    } else {
+      setCampuses([]);
+      setCampusFilter('');
+    }
+  }, [institutionFilter]);
+
+  const loadInstitutions = async () => {
+    try {
+      setLoadingInstitutions(true);
+      const response = await api<{ institutions: Institution[] }>("/institutions?page=0&size=100&enabled=true");
+      setInstitutions(response.institutions || []);
+    } catch (err: any) {
+      console.error("Error al cargar instituciones:", err);
+    } finally {
+      setLoadingInstitutions(false);
+    }
+  };
+
+  const loadCampusesForFilter = async (institutionId: string) => {
+    try {
+      setLoadingCampuses(true);
+      const response = await api<{ campuses: Campus[] }>(`/institutions/campuses?institutionId=${institutionId}&page=0&size=100&enabled=true`);
+      setCampuses(response.campuses || []);
+    } catch (err: any) {
+      console.error("Error al cargar campus:", err);
+      setCampuses([]);
+    } finally {
+      setLoadingCampuses(false);
+    }
+  };
 
   const loadStatistics = useCallback(async () => {
     try {
       setLoading(true);
+      const params = new URLSearchParams();
+      if (selectedYear) params.append('year', selectedYear.toString());
+      if (institutionFilter) params.append('institutionId', institutionFilter);
+      if (campusFilter) params.append('campusId', campusFilter);
+
       const [careers, timeSeriesData] = await Promise.all([
-        api<CareerStats[]>('/v1/admin/statistics/by-career'),
-        api<TimeSeriesStats>(`/v1/admin/statistics/time-series?year=${selectedYear}`),
+        api<CareerStats[]>(`/v1/admin/statistics/by-career?${params.toString()}`),
+        api<TimeSeriesStats>(`/v1/admin/statistics/time-series?${params.toString()}`),
       ]);
       setCareerStats(careers);
       setTimeSeries(timeSeriesData);
@@ -80,7 +144,7 @@ export default function AdminStatisticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedYear]);
+  }, [selectedYear, institutionFilter, campusFilter]);
 
   useEffect(() => {
     loadStatistics();
@@ -98,21 +162,64 @@ export default function AdminStatisticsPage() {
               <Link href="/admin/statistics" className="text-blue-600 font-medium">Estadísticas</Link>
               {careerStats.length > 0 && (
                 <div className="flex space-x-2 ml-4">
-                  <a
-                    href={`/api/admin/export/csv?type=statistics&year=${selectedYear}`}
-                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                    download
+                  <button
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('authToken');
+                        if (!token) {
+                          alert('No estás autenticado. Por favor, inicia sesión.');
+                          return;
+                        }
+
+                        // Crear URL con token y filtros
+                        let url = `/api/admin/export/csv?type=statistics&year=${selectedYear}&token=${encodeURIComponent(token)}`;
+                        if (institutionFilter) url += `&institutionId=${institutionFilter}`;
+                        if (campusFilter) url += `&campusId=${campusFilter}`;
+                        
+                        // Crear enlace temporal para descargar
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `estadisticas_${selectedYear}.csv`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      } catch (error) {
+                        console.error('Error al exportar CSV:', error);
+                        alert('Error al exportar CSV. Por favor, intenta nuevamente.');
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
                   >
                     Exportar CSV
-                  </a>
-                  <a
-                    href={`/api/admin/export/pdf?type=statistics&year=${selectedYear}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('authToken');
+                        if (!token) {
+                          alert('No estás autenticado. Por favor, inicia sesión.');
+                          return;
+                        }
+
+                        // Crear URL con token y filtros
+                        let url = `/api/admin/export/pdf?type=statistics&year=${selectedYear}&token=${encodeURIComponent(token)}`;
+                        if (institutionFilter) url += `&institutionId=${institutionFilter}`;
+                        if (campusFilter) url += `&campusId=${campusFilter}`;
+                        
+                        // Abrir en nueva ventana para descargar
+                        const newWindow = window.open(url, '_blank');
+                        if (!newWindow) {
+                          alert('Por favor, permite ventanas emergentes para descargar el PDF');
+                        }
+                      } catch (error) {
+                        console.error('Error al exportar PDF:', error);
+                        alert('Error al exportar PDF. Por favor, intenta nuevamente.');
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
                   >
                     Exportar PDF
-                  </a>
+                  </button>
                 </div>
               )}
             </nav>
@@ -122,14 +229,14 @@ export default function AdminStatisticsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filtros y controles */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {[2023, 2024, 2025].map((year) => (
                   <option key={year} value={year}>
@@ -138,10 +245,59 @@ export default function AdminStatisticsPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Institución</label>
+              <select
+                value={institutionFilter}
+                onChange={(e) => {
+                  setInstitutionFilter(e.target.value);
+                  setCampusFilter('');
+                }}
+                disabled={loadingInstitutions}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">Todas las instituciones</option>
+                {institutions.map((inst) => (
+                  <option key={inst.id} value={inst.id}>{inst.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Campus/Sede</label>
+              <select
+                value={campusFilter}
+                onChange={(e) => setCampusFilter(e.target.value)}
+                disabled={loadingCampuses || !institutionFilter}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">
+                  {!institutionFilter 
+                    ? "Primero selecciona una institución"
+                    : loadingCampuses 
+                    ? "Cargando..." 
+                    : "Todos los campus"}
+                </option>
+                {campuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>{campus.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setInstitutionFilter('');
+                  setCampusFilter('');
+                  setSelectedYear(new Date().getFullYear());
+                }}
+                className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Limpiar Filtros
+              </button>
+            </div>
           </div>
 
           {/* Botones de vista */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 mt-4">
             <button
               onClick={() => setViewMode('charts')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -329,6 +485,10 @@ export default function AdminStatisticsPage() {
     </div>
   );
 }
+
+
+
+
 
 
 

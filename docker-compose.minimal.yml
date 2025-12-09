@@ -1,0 +1,64 @@
+version: '3.8'
+
+# =============================================================================
+# Docker Compose MÍNIMO - Solo servicios de infraestructura
+# =============================================================================
+# Este archivo solo levanta PostgreSQL y Redis
+# El API y Web se ejecutan localmente para desarrollo más rápido
+#
+# Uso:
+#   docker-compose -f docker-compose.minimal.yml up -d
+#   docker-compose -f docker-compose.minimal.yml down
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: eco-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecoestudiante}
+      POSTGRES_USER: ${POSTGRES_USER:-eco}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eco}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eco -d ecoestudiante"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecoestudiante-network
+
+  # ===========================================================================
+  # Redis Cache (opcional, para rate limiting)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: eco-redis
+    command: redis-server --requirepass eco
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ecoestudiante-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  ecoestudiante-network:
+    driver: bridge

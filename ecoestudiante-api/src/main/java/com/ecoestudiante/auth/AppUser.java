@@ -22,6 +22,8 @@ public class AppUser {
     private String authProvider; // 'local', 'google'
     private String pictureUrl;
     private String role; // 'STUDENT', 'ADMIN', 'MODERATOR'
+    private UUID institutionId; // ID de la institución educativa
+    private UUID campusId; // ID del campus/sede
 
     /**
      * Verifica si el usuario tiene rol de administrador

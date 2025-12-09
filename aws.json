@@ -1,0 +1,319 @@
+{
+  "id": "5eef3532-6d1f-49bb-be2b-b80a09dd7f0c",
+  "name": "ecoestudiante-estimacion",
+  "createdAt": "6 de diciembre de 2025, 19:54 (UTC-3:00)",
+  "expiresAt": "6 de enero de 2027, 19:54 (UTC-3:00)",
+  "rateType": "BEFORE_DISCOUNTS",
+  "rateTimestamp": "6 de diciembre de 2025, 19:54 (UTC-3:00)",
+  "status": "VALID",
+  "totalCostHistorical": 0,
+  "totalCostEstimated": 269.68739999999997,
+  "currency": "USD",
+  "exportCreatedAt": "7 de diciembre de 2025, 7:25 (UTC-3:00)",
+  "items": [
+    {
+      "serviceCode": "AWSELB",
+      "usageType": "SAE1-LCUUsage",
+      "operation": "LoadBalancing:Application",
+      "location": "sa-east-1",
+      "usageId": "1f117c94-9b37-4de3-806a-856b6362b8dd",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "LCU-Hrs",
+        "amount": 73
+      },
+      "costSummary": {
+        "cost": 0.803,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonRDS",
+      "usageType": "SAE1-RDS:GP3-Storage",
+      "operation": "CreateDBInstance:0014",
+      "location": "sa-east-1",
+      "usageId": "481e2a8c-c99c-4a50-a4fb-7e4c8e68fd1b",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "GB-Mo",
+        "amount": 30
+      },
+      "costSummary": {
+        "cost": 6.57,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonEC2",
+      "usageType": "SAE1-EBS:VolumeUsage.gp3",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "6fa339fa-4a89-4d87-b292-0d51c4b9c445",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "GB-Mo",
+        "amount": 30
+      },
+      "costSummary": {
+        "cost": 4.56,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonS3",
+      "usageType": "SAE1-Requests-Tier1",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "71967155-ef67-444b-b690-c98761a982e2",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Requests",
+        "amount": 2000
+      },
+      "costSummary": {
+        "cost": 0.014,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AWSSecretsManager",
+      "usageType": "SAE1-AWSSecretsManagerAPIRequest",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "7388b7eb-0e58-4cc4-9161-e6c568236fe8",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "API Requests",
+        "amount": 10000
+      },
+      "costSummary": {
+        "cost": 0.05,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AWSELB",
+      "usageType": "SAE1-LoadBalancerUsage",
+      "operation": "LoadBalancing:Application",
+      "location": "sa-east-1",
+      "usageId": "9486237f-db68-4472-9c6e-3bf4633391b0",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Hrs",
+        "amount": 730
+      },
+      "costSummary": {
+        "cost": 24.82,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonEC2",
+      "usageType": "SAE1-BoxUsage:t3.medium",
+      "operation": "RunInstances",
+      "location": "sa-east-1",
+      "usageId": "97126826-325c-452b-bb87-89e8601893ed",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Hrs",
+        "amount": 1460
+      },
+      "costSummary": {
+        "cost": 98.112,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonCloudWatch",
+      "usageType": "SAE1-CW:MetricMonitorUsage",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "9957b60e-9601-4db2-9b10-989a63a6b5ea",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Metrics",
+        "amount": 50
+      },
+      "costSummary": {
+        "cost": 15,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonEKS",
+      "usageType": "SAE1-AmazonEKS-Hours:perCluster",
+      "operation": "CreateOperation",
+      "location": "sa-east-1",
+      "usageId": "99720348-ca04-4a72-af78-5c54678c803f",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Hours",
+        "amount": 730
+      },
+      "costSummary": {
+        "cost": 73,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AWSSecretsManager",
+      "usageType": "SAE1-AWSSecretsManager-Secrets",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "a8530ee2-defc-44bb-919b-adf3264f290b",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Secrets",
+        "amount": 5
+      },
+      "costSummary": {
+        "cost": 2,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonCloudWatch",
+      "usageType": "SAE1-DataProcessing-Bytes",
+      "operation": "PutLogEvents",
+      "location": "sa-east-1",
+      "usageId": "b6c80ace-ea43-4fb7-81ad-a13d71d66f17",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "GB",
+        "amount": 5
+      },
+      "costSummary": {
+        "cost": 4.5,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonRDS",
+      "usageType": "SAE1-InstanceUsage:db.t4g.micro",
+      "operation": "CreateDBInstance:0014",
+      "location": "sa-east-1",
+      "usageId": "d6bf972a-0c8f-499a-b6a5-681455f2a516",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Hrs",
+        "amount": 730
+      },
+      "costSummary": {
+        "cost": 24.82,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AWSDataTransfer",
+      "usageType": "SAE1-DataTransfer-Out-Bytes",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "d7e8a6bb-aef9-42ae-a83e-f5b1b40cfeb7",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "GB",
+        "amount": 100
+      },
+      "costSummary": {
+        "cost": 15,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonCloudWatch",
+      "usageType": "SAE1-TimedStorage-ByteHrs",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "dc38087f-4488-441b-a445-becaa9374327",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "GB-Mo",
+        "amount": 0.75
+      },
+      "costSummary": {
+        "cost": 0.0306,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonS3",
+      "usageType": "SAE1-Requests-Tier2",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "df424537-0054-488e-b66a-e61a8052e35b",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "Requests",
+        "amount": 5000
+      },
+      "costSummary": {
+        "cost": 0.0028,
+        "currency": "USD",
+        "status": "new"
+      }
+    },
+    {
+      "serviceCode": "AmazonS3",
+      "usageType": "SAE1-TimedStorage-ByteHrs",
+      "operation": "",
+      "location": "sa-east-1",
+      "usageId": "f6c51ef2-7076-42a2-83b3-6c6aedef2bc3",
+      "usageAccountId": 401115924561,
+      "accountName": "",
+      "group": "ADMIN-ECO",
+      "quantity": {
+        "unit": "GB-Mo",
+        "amount": 10
+      },
+      "costSummary": {
+        "cost": 0.405,
+        "currency": "USD",
+        "status": "new"
+      }
+    }
+  ]
+}

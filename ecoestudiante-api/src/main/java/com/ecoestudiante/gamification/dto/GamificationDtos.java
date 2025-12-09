@@ -59,25 +59,25 @@ public final class GamificationDtos {
 
     /**
      * Representa el balance de XP (puntos de experiencia) del usuario.
-     * 
+     *
      * El sistema de XP recompensa acciones positivas como calcular huella,
      * completar challenges, mantener rachas, etc.
      */
     public record XPBalance(
             @Schema(description = "XP total acumulado", example = "1250")
-            Integer totalXP,
-            
+            Integer totalXp,
+
             @Schema(description = "Nivel actual del usuario", example = "5")
             Integer currentLevel,
-            
+
             @Schema(description = "XP necesario para el siguiente nivel", example = "1500")
             Integer xpToNextLevel,
-            
+
             @Schema(description = "XP ganado en el último mes")
             Integer xpThisMonth,
-            
+
             @Schema(description = "Última actualización del balance")
-            LocalDateTime lastUpdated
+            LocalDateTime updatedAt
     ) {}
 
     /**

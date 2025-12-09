@@ -52,6 +52,22 @@ spring:
           metadata:
             service-name: admin-service
 
+        # Servicio de Gestión de Usuarios
+        - id: user-management-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/users/**
+          metadata:
+            service-name: user-management-service
+        
+        # Servicio de Instituciones Educativas
+        - id: institution-service
+          uri: ${BACKEND_API_URL:http://api:8080}
+          predicates:
+            - Path=/api/v1/institutions/**
+          metadata:
+            service-name: institution-service
+
   # Redis para rate limiting (Fase 4)
   data:
     redis:

@@ -18,7 +18,7 @@ public interface AdminService {
     /**
      * Obtiene lista de estudiantes con paginación
      */
-    AdminDtos.StudentsListResponse getStudents(Integer page, Integer pageSize, String search, String career);
+    AdminDtos.StudentsListResponse getStudents(Integer page, Integer pageSize, String search, String career, UUID institutionId, UUID campusId);
     
     /**
      * Obtiene detalles completos de un estudiante
@@ -28,13 +28,17 @@ public interface AdminService {
     /**
      * Obtiene estadísticas por carrera
      */
-    List<AdminDtos.CareerStats> getStatisticsByCareer(String career, Integer year);
+    List<AdminDtos.CareerStats> getStatisticsByCareer(String career, Integer year, UUID institutionId, UUID campusId);
     
     /**
      * Obtiene estadísticas de series temporales
      */
-    AdminDtos.TimeSeriesStats getTimeSeriesStatistics(Integer year);
+    AdminDtos.TimeSeriesStats getTimeSeriesStatistics(Integer year, UUID institutionId, UUID campusId);
 }
+
+
+
+
 
 
 

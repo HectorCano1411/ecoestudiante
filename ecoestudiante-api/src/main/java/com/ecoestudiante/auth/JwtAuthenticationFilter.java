@@ -41,6 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         logger.debug("Filtro JWT - Path: {}, Method: {}", path, request.getMethod());
         
+        // Endpoints públicos (sin autenticación requerida)
         if (path.startsWith("/api/v1/auth/") || 
             path.startsWith("/api/auth/") ||
             path.startsWith("/healthz") || 
@@ -51,6 +52,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             logger.debug("Filtro JWT - Saltando procesamiento para path público: {}", path);
             chain.doFilter(request, response);
             return;
+        }
+        
+        // Permitir acceso público a instituciones habilitadas (para registro)
+        // Solo cuando enabled=true y no hay otros filtros sensibles
+        if (path.startsWith("/api/v1/institutions") && "GET".equals(request.getMethod())) {
+            String enabledParam = request.getParameter("enabled");
+            String searchParam = request.getParameter("search");
+            String typeParam = request.getParameter("type");
+            
+            boolean isPublicAccess = "true".equals(enabledParam) && 
+                                   (searchParam == null || searchParam.trim().isEmpty()) &&
+                                   (typeParam == null || typeParam.trim().isEmpty());
+            
+            if (isPublicAccess) {
+                logger.debug("Filtro JWT - Acceso público permitido a instituciones habilitadas: {}", path);
+                chain.doFilter(request, response);
+                return;
+            }
+        }
+        
+        // Permitir acceso público a campus habilitados de una institución específica (para registro)
+        if (path.startsWith("/api/v1/institutions/campuses") && "GET".equals(request.getMethod())) {
+            String enabledParam = request.getParameter("enabled");
+            String institutionIdParam = request.getParameter("institutionId");
+            String searchParam = request.getParameter("search");
+            
+            boolean isPublicAccess = "true".equals(enabledParam) && 
+                                   institutionIdParam != null && !institutionIdParam.trim().isEmpty() &&
+                                   (searchParam == null || searchParam.trim().isEmpty());
+            
+            if (isPublicAccess) {
+                logger.debug("Filtro JWT - Acceso público permitido a campus habilitados: {}", path);
+                chain.doFilter(request, response);
+                return;
+            }
         }
 
         final String authHeader = request.getHeader("Authorization");
@@ -126,25 +162,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String role = null;
                     try {
                         role = jwtUtil.extractRole(token);
+                        logger.info("🔍 [JWT Filter] Rol extraído del token: '{}'", role);
                     } catch (Exception e) {
-                        logger.debug("No se pudo extraer rol del token, usando STUDENT por defecto");
+                        logger.warn("⚠️ [JWT Filter] No se pudo extraer rol del token: {}", e.getMessage());
                     }
 
-                    // Si no hay rol, usar STUDENT por defecto
-                    String userRole = (role != null && !role.isBlank()) ? role : "STUDENT";
+                    // Normalizar el rol a mayúsculas y eliminar espacios
+                    // IMPORTANTE: Spring Security con hasAnyRole() automáticamente agrega "ROLE_" al inicio
+                    // Por lo tanto, si el rol es "PROFESOR", la authority debe ser "ROLE_PROFESOR"
+                    String userRole = (role != null && !role.isBlank()) 
+                        ? role.toUpperCase().trim().replaceAll("\\s+", "") 
+                        : "ESTUDIANTE";
+                    
+                    logger.info("🔍 [JWT Filter] Rol normalizado: '{}' (original: '{}')", userRole, role);
 
                     // Agregar el rol como authority (Spring Security requiere prefijo ROLE_)
+                    // hasAnyRole('ADMIN', 'SUPER_ADMIN', 'PROFESOR') busca "ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_PROFESOR"
                     String authority = "ROLE_" + userRole;
+                    logger.info("🔍 [JWT Filter] Authority creada: '{}'", authority);
+
+                    // Crear lista de autoridades (puede incluir múltiples roles en el futuro)
+                    List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(authority));
+                    
+                    logger.info("🔍 [JWT Filter] Authorities completas: {}", 
+                        authorities.stream().map(a -> a.getAuthority()).toList());
 
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    principal,
+                        principal,
                         null,
-                        List.of(new SimpleGrantedAuthority(authority))
+                        authorities
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                logger.info("✅ Autenticación establecida en SecurityContext - Principal: {}, UserId: {}, Role: {}", principal, userId, userRole);
+                    logger.info("✅ [JWT Filter] Autenticación establecida en SecurityContext - Principal: {}, UserId: {}, Role: {}, Authority: {}", 
+                        principal, userId, userRole, authority);
             } else {
                 logger.warn("⚠️ Token presente pero no se pudo establecer autenticación - Token válido: {}, Username: {}, UserId: {}", 
                     tokenUtil.isTokenValid(token), username, userId);

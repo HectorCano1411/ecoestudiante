@@ -2,8 +2,10 @@ package com.ecoestudiante.auth;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 public class AuthDtos {
 
@@ -28,7 +30,13 @@ public class AuthDtos {
             String carrera,
 
             @NotBlank(message = "Jornada es requerida")
-            String jornada
+            String jornada,
+
+            @NotNull(message = "Institución es requerida")
+            UUID institutionId,
+
+            @NotNull(message = "Campus es requerido")
+            UUID campusId
     ) {}
 
     public record LoginRequest(

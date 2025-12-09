@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
-import { getSession } from '@auth0/nextjs-auth0';
+// import { getSession } from '@auth0/nextjs-auth0'; // DESHABILITADO: Incompatible con Next.js 15 (cookies() asíncrono)
 
 /**
  * 🔐 AUTENTICACIÓN DUAL ROBUSTA (JWT + Auth0)
@@ -69,52 +69,47 @@ async function getUserIdFromAuth(req: NextRequest): Promise<{
   // ========================================================================
   // PRIORIDAD 2: Auth0 Session (Fallback)
   // ========================================================================
-  // Intentar obtener sesión de Auth0 desde cookies
-  // IMPORTANTE: getSession() requiere el Request object
-  try {
-    // Verificar si Auth0 está configurado
-    const isAuth0Enabled = Boolean(
-      process.env.AUTH0_SECRET &&
-      process.env.AUTH0_CLIENT_ID &&
-      process.env.AUTH0_CLIENT_SECRET &&
-      process.env.AUTH0_ISSUER_BASE_URL
-    );
+  // IMPORTANTE: Auth0 está deshabilitado temporalmente debido a incompatibilidad
+  // con Next.js 15 (cookies() asíncrono). Si necesitas Auth0, actualiza
+  // @auth0/nextjs-auth0 a la versión más reciente que soporte Next.js 15.
+  // Por ahora, solo usamos JWT tradicional.
+  
+  // Verificar si Auth0 está configurado
+  const isAuth0Enabled = Boolean(
+    process.env.AUTH0_SECRET &&
+    process.env.AUTH0_CLIENT_ID &&
+    process.env.AUTH0_CLIENT_SECRET &&
+    process.env.AUTH0_ISSUER_BASE_URL
+  );
 
-    if (isAuth0Enabled) {
-      // getSession() de @auth0/nextjs-auth0 requiere Request + Response
-      // En Next.js 15 App Router, necesitamos llamarlo sin parámetros
-      // (usa cookies internamente)
+  // DESHABILITADO TEMPORALMENTE: Auth0 tiene problemas con Next.js 15
+  // Descomenta el siguiente bloque cuando actualices @auth0/nextjs-auth0
+  // o cuando Auth0 soporte completamente Next.js 15
+  /*
+  if (isAuth0Enabled) {
+    try {
+      // NOTA: getSession() en Next.js 15 requiere versión actualizada de @auth0/nextjs-auth0
+      // que soporte cookies() asíncrono. Versión mínima recomendada: 4.0.0+
       const session = await getSession();
 
       if (session && session.user && session.user.sub) {
-        // Auth0 usa 'sub' como identificador único del usuario
         const userId = session.user.sub;
-
         logger.info('route:auth-me', '✅ [AUTH0] UserId extraído exitosamente', {
           userId,
-          authType: 'auth0',
-          email: session.user.email,
-          name: session.user.name
+          authType: 'auth0'
         });
-
         return { userId, authType: 'auth0' };
-      } else {
-        logger.debug('route:auth-me', 'getSession() retornó sesión vacía o sin user.sub', {
-          hasSession: !!session,
-          hasUser: !!(session && session.user),
-          sessionKeys: session ? Object.keys(session) : []
-        });
       }
-    } else {
-      logger.debug('route:auth-me', 'Auth0 no está configurado - saltando verificación Auth0');
+    } catch (sessionError: any) {
+      logger.debug('route:auth-me', 'Error al obtener sesión de Auth0', {
+        error: sessionError.message
+      });
     }
-  } catch (auth0Error: any) {
-    logger.debug('route:auth-me', 'Error al obtener sesión de Auth0', {
-      error: auth0Error.message,
-      errorName: auth0Error.name,
-      stack: auth0Error.stack ? auth0Error.stack.substring(0, 200) : undefined
-    });
-    // No es un error crítico - simplemente no hay sesión de Auth0
+  }
+  */
+  
+  if (isAuth0Enabled) {
+    logger.debug('route:auth-me', 'Auth0 está configurado pero deshabilitado temporalmente (Next.js 15 compatibility)');
   }
 
   // ========================================================================
@@ -160,24 +155,11 @@ export async function GET(req: NextRequest) {
     };
 
     // Si es Auth0, obtener información adicional del usuario
+    // NOTA: Auth0 deshabilitado temporalmente - solo retornamos userId básico
     if (authType === 'auth0') {
-      try {
-        const session = await getSession();
-        if (session && session.user) {
-          userInfo = {
-            userId,
-            authType,
-            name: session.user.name || null,
-            email: session.user.email || null,
-            picture: session.user.picture || null,
-            nickname: session.user.nickname || null
-          };
-        }
-      } catch (error: any) {
-        logger.warn('route:auth-me', 'No se pudo obtener info adicional de Auth0', {
-          error: error.message
-        });
-      }
+      // Auth0 está deshabilitado temporalmente debido a Next.js 15
+      // Solo retornamos el userId básico
+      logger.debug('route:auth-me', 'Auth0 info adicional deshabilitada temporalmente');
     }
 
     logger.info('route:auth-me', '🟢 Success - userId found', {

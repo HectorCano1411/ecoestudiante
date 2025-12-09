@@ -121,10 +121,10 @@ li[data-key]:hover,
 }
 
 /* =============================================================================
-   LABELS - Dark text with maximum contrast
+   LABELS - Dark text with maximum contrast + OUTSIDE PLACEMENT FIX
    ============================================================================= */
 
-/* Select labels */
+/* Select labels - Base styles */
 [data-slot="label"],
 .nextui-select-label,
 label[data-slot="label"] {
@@ -133,6 +133,58 @@ label[data-slot="label"] {
   font-size: 14px !important;
   margin-bottom: 6px !important;
   letter-spacing: 0.025em !important;
+}
+
+/*
+ * CRITICAL FIX: Label Placement Outside
+ * Fuerza separación visual entre label y valor seleccionado
+ */
+
+/* Label externo - Posicionamiento absoluto para evitar overlay */
+.filter-dropdown-1 [data-slot="label"],
+.filter-dropdown-2 [data-slot="label"],
+.filter-dropdown-3 [data-slot="label"],
+.filter-dropdown-4 [data-slot="label"],
+.filter-dropdown-5 [data-slot="label"],
+.filter-dropdown-6 [data-slot="label"] {
+  display: block !important;
+  position: relative !important;
+  z-index: 1 !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 4px !important;
+  color: #334155 !important; /* slate-700 */
+  font-size: 0.875rem !important; /* 14px */
+  font-weight: 600 !important;
+  line-height: 1.25rem !important;
+  pointer-events: none !important; /* No interfiere con clicks */
+}
+
+/* Trigger button - Asegurar que no contenga el label */
+.filter-dropdown-1 [data-slot="trigger"],
+.filter-dropdown-2 [data-slot="trigger"],
+.filter-dropdown-3 [data-slot="trigger"],
+.filter-dropdown-4 [data-slot="trigger"],
+.filter-dropdown-5 [data-slot="trigger"],
+.filter-dropdown-6 [data-slot="trigger"] {
+  position: relative !important;
+  z-index: 0 !important;
+  min-height: 48px !important;
+  margin-top: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+/* Main wrapper - Asegurar layout vertical */
+.filter-dropdown-1,
+.filter-dropdown-2,
+.filter-dropdown-3,
+.filter-dropdown-4,
+.filter-dropdown-5,
+.filter-dropdown-6 {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  position: relative !important;
 }
 
 /* =============================================================================
@@ -178,16 +230,37 @@ label[data-slot="label"] {
 }
 
 /* =============================================================================
-   Z-INDEX MANAGEMENT - Prevent dropdown overlap
+   Z-INDEX MANAGEMENT - Prevent dropdown overlap (FIXED)
    ============================================================================= */
 
-/* Progressive z-index for dropdowns to prevent overlap */
-.filter-dropdown-1 [data-slot="popover-content"] { z-index: 100 !important; }
-.filter-dropdown-2 [data-slot="popover-content"] { z-index: 90 !important; }
-.filter-dropdown-3 [data-slot="popover-content"] { z-index: 80 !important; }
-.filter-dropdown-4 [data-slot="popover-content"] { z-index: 70 !important; }
-.filter-dropdown-5 [data-slot="popover-content"] { z-index: 60 !important; }
-.filter-dropdown-6 [data-slot="popover-content"] { z-index: 50 !important; }
+/**
+ * ESTRATEGIA CORREGIDA: Z-Index Creciente Progresivo + Boost para Dropdown Abierto
+ *
+ * Problema anterior: Z-index decreciente (100→50) causaba que dropdowns inferiores
+ * se mostraran DETRÁS de labels y elementos superiores.
+ *
+ * Solución: Z-index CRECIENTE (1001→1006) asegura que cada dropdown esté sobre
+ * los anteriores. Además, dropdown abierto recibe z-index: 2000 para estar
+ * garantizado en el tope de la jerarquía visual.
+ */
+
+/* Progressive z-index CRECIENTE para dropdowns (de top a bottom) */
+.filter-dropdown-1 [data-slot="popover-content"] { z-index: 1001 !important; }
+.filter-dropdown-2 [data-slot="popover-content"] { z-index: 1002 !important; }
+.filter-dropdown-3 [data-slot="popover-content"] { z-index: 1003 !important; }
+.filter-dropdown-4 [data-slot="popover-content"] { z-index: 1004 !important; }
+.filter-dropdown-5 [data-slot="popover-content"] { z-index: 1005 !important; }
+.filter-dropdown-6 [data-slot="popover-content"] { z-index: 1006 !important; }
+
+/* BOOST: Dropdown abierto siempre en el tope absoluto */
+.filter-dropdown-1 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-2 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-3 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-4 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-5 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-6 [data-open="true"] [data-slot="popover-content"] {
+  z-index: 2000 !important; /* Máximo z-index cuando está abierto */
+}
 
 /* =============================================================================
    ACCESSIBILITY - Ensure keyboard navigation is visible

@@ -2,3 +2,4 @@
 export { default as MissionCard } from './MissionCard';
 export { default as Leaderboard } from './Leaderboard';
 export { default as GamificationProfile } from './GamificationProfile';
+export { default as MissionCompletedCelebration } from './MissionCompletedCelebration';

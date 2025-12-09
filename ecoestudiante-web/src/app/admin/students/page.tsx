@@ -26,6 +26,18 @@ interface StudentsListResponse {
   pageSize: number;
 }
 
+interface Institution {
+  id: string;
+  name: string;
+  type: string;
+}
+
+interface Campus {
+  id: string;
+  name: string;
+  institutionId: string;
+}
+
 export default function AdminStudentsPage() {
   const router = useRouter();
   const [data, setData] = useState<StudentsListResponse | null>(null);
@@ -34,9 +46,56 @@ export default function AdminStudentsPage() {
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState('');
   const [careerFilter, setCareerFilter] = useState('');
+  const [institutionFilter, setInstitutionFilter] = useState('');
+  const [campusFilter, setCampusFilter] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [xpLevelFilter, setXpLevelFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+  const [loadingCampuses, setLoadingCampuses] = useState(false);
+
+  // Cargar instituciones al montar
+  useEffect(() => {
+    loadInstitutions();
+  }, []);
+
+  // Cargar campus cuando se selecciona una institución
+  useEffect(() => {
+    if (institutionFilter) {
+      loadCampuses(institutionFilter);
+      setCampusFilter(''); // Limpiar campus al cambiar institución
+    } else {
+      setCampuses([]);
+      setCampusFilter('');
+    }
+  }, [institutionFilter]);
+
+  const loadInstitutions = async () => {
+    try {
+      setLoadingInstitutions(true);
+      const response = await api<{ institutions: Institution[] }>("/institutions?page=0&size=100&enabled=true");
+      setInstitutions(response.institutions || []);
+    } catch (err: any) {
+      console.error("Error al cargar instituciones:", err);
+    } finally {
+      setLoadingInstitutions(false);
+    }
+  };
+
+  const loadCampuses = async (institutionId: string) => {
+    try {
+      setLoadingCampuses(true);
+      const response = await api<{ campuses: Campus[] }>(`/institutions/campuses?institutionId=${institutionId}&page=0&size=100&enabled=true`);
+      setCampuses(response.campuses || []);
+    } catch (err: any) {
+      console.error("Error al cargar campus:", err);
+      setCampuses([]);
+    } finally {
+      setLoadingCampuses(false);
+    }
+  };
 
   const loadStudents = useCallback(async () => {
     try {
@@ -47,6 +106,8 @@ export default function AdminStudentsPage() {
       });
       if (search) params.append('search', search);
       if (careerFilter) params.append('career', careerFilter);
+      if (institutionFilter) params.append('institutionId', institutionFilter);
+      if (campusFilter) params.append('campusId', campusFilter);
 
       const response = await api<StudentsListResponse>(`/v1/admin/students?${params.toString()}`);
       setData(response);
@@ -55,7 +116,7 @@ export default function AdminStudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search, careerFilter]);
+  }, [page, pageSize, search, careerFilter, institutionFilter, campusFilter]);
 
   useEffect(() => {
     loadStudents();
@@ -70,6 +131,8 @@ export default function AdminStudentsPage() {
   const handleResetFilters = () => {
     setSearch('');
     setCareerFilter('');
+    setInstitutionFilter('');
+    setCampusFilter('');
     setStatusFilter('all');
     setXpLevelFilter('all');
     setPage(1);
@@ -123,13 +186,13 @@ export default function AdminStudentsPage() {
         <div className="bg-white rounded-lg shadow mb-6 p-6">
           <form onSubmit={handleSearch} className="space-y-4">
             {/* Filtros básicos */}
-            <div className="flex gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <input
                 type="text"
                 placeholder="Buscar por nombre o email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <select
                 value={careerFilter}
@@ -139,13 +202,57 @@ export default function AdminStudentsPage() {
                 <option value="">Todas las carreras</option>
                 <option value="Ingeniería en Informática">Ingeniería en Informática</option>
                 <option value="Ingeniería Civil">Ingeniería Civil</option>
+                <option value="Ingeniería Industrial">Ingeniería Industrial</option>
+                <option value="Ingeniería Comercial">Ingeniería Comercial</option>
               </select>
+              <select
+                value={institutionFilter}
+                onChange={(e) => {
+                  setInstitutionFilter(e.target.value);
+                  setCampusFilter('');
+                }}
+                disabled={loadingInstitutions}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">Todas las instituciones</option>
+                {institutions.map((inst) => (
+                  <option key={inst.id} value={inst.id}>{inst.name}</option>
+                ))}
+              </select>
+              <select
+                value={campusFilter}
+                onChange={(e) => setCampusFilter(e.target.value)}
+                disabled={loadingCampuses || !institutionFilter}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">
+                  {!institutionFilter 
+                    ? "Primero selecciona una institución"
+                    : loadingCampuses 
+                    ? "Cargando..." 
+                    : "Todos los campus"}
+                </option>
+                {campuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>{campus.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
               <button
                 type="submit"
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Buscar
               </button>
+              {(search || careerFilter || institutionFilter || campusFilter) && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  Limpiar
+                </button>
+              )}
             </div>
 
             {/* Botón de filtros avanzados */}
@@ -385,6 +492,10 @@ export default function AdminStudentsPage() {
     </div>
   );
 }
+
+
+
+
 
 
 

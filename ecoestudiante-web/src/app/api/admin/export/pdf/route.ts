@@ -38,10 +38,24 @@ interface CareerStats {
 
 export async function GET(req: NextRequest) {
   try {
+    // Obtener token de autenticación
     const { token, type } = await getAuthToken(req);
-    if (!token) {
+    
+    // Si no hay token en el header, intentar obtenerlo de los query params (para descargas directas)
+    let authToken = token;
+    if (!authToken) {
+      const searchParams = req.nextUrl.searchParams;
+      const tokenParam = searchParams.get('token');
+      if (tokenParam) {
+        authToken = tokenParam;
+        logger.info('route:admin-export-pdf', 'Token obtenido de query params');
+      }
+    }
+
+    if (!authToken) {
+      logger.warn('route:admin-export-pdf', 'No se encontró token de autenticación');
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized', message: 'Token de autenticación requerido' },
         { status: 401 }
       );
     }
@@ -49,50 +63,177 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const typeParam = searchParams.get('type') || 'dashboard';
     const year = searchParams.get('year') || new Date().getFullYear().toString();
+    const institutionId = searchParams.get('institutionId') || undefined;
+    const campusId = searchParams.get('campusId') || undefined;
 
-    logger.info('route:admin-export-pdf', 'income', { type: typeParam, year, authType: type });
+    logger.info('route:admin-export-pdf', 'income', {
+      type: typeParam,
+      year,
+      institutionId,
+      campusId,
+      authType: type
+    });
 
     let htmlContent = '';
     let filename = 'reporte.pdf';
 
-    if (typeParam === 'dashboard') {
-      const data = await backendFetch<DashboardOverview>('/api/v1/admin/dashboard', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+    // Obtener nombres de institución y campus para mostrar en el reporte
+    let institutionName = '';
+    let campusName = '';
 
-      filename = `dashboard_${new Date().toISOString().split('T')[0]}.pdf`;
-      htmlContent = generateDashboardHTML(data);
-    } else if (typeParam === 'statistics') {
-      const stats = await backendFetch<CareerStats[]>('/api/v1/admin/statistics/by-career', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+    try {
+      // Si hay filtros, obtener los nombres
+      if (institutionId) {
+        try {
+          const instResponse = await backendFetch<{id: string, name: string}>(`/api/v1/institutions/${institutionId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          institutionName = instResponse.name;
+        } catch (error) {
+          logger.warn('route:admin-export-pdf', 'No se pudo obtener nombre de institución', { institutionId });
+        }
+      }
 
-      filename = `estadisticas_${year}.pdf`;
-      htmlContent = generateStatisticsHTML(stats, year);
+      if (campusId) {
+        try {
+          const campusResponse = await backendFetch<{id: string, name: string}>(`/api/v1/institutions/campuses/${campusId}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          campusName = campusResponse.name;
+        } catch (error) {
+          logger.warn('route:admin-export-pdf', 'No se pudo obtener nombre de campus', { campusId });
+        }
+      }
+    } catch (error) {
+      logger.warn('route:admin-export-pdf', 'Error al obtener nombres de filtros', error);
     }
 
-    // Por ahora retornamos HTML para que el navegador lo imprima
-    // En producción, podrías usar una librería como Puppeteer o PDFKit
-    // El filename se puede usar en el header Content-Disposition cuando se implemente la generación real de PDF
-    return new NextResponse(htmlContent, {
+    try {
+      if (typeParam === 'dashboard') {
+        // Corregir la ruta del endpoint - debe ser /overview
+        const data = await backendFetch<DashboardOverview>('/api/v1/admin/dashboard/overview', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }).catch((error: any) => {
+          logger.error('route:admin-export-pdf', 'Error al obtener datos del dashboard', {
+            error: error.message,
+            status: error.status
+          });
+          throw error;
+        });
+
+        // Personalizar nombre de archivo según filtros
+        let filenameParts = ['dashboard'];
+        if (institutionId) filenameParts.push('institucion');
+        if (campusId) filenameParts.push('campus');
+        filenameParts.push(new Date().toISOString().split('T')[0]);
+        filename = `${filenameParts.join('_')}.pdf`;
+
+        htmlContent = generateDashboardHTML(data, institutionName, campusName);
+      } else if (typeParam === 'statistics') {
+        // Construir query params con filtros
+        const params = new URLSearchParams();
+        if (year) params.append('year', year);
+        if (institutionId) params.append('institutionId', institutionId);
+        if (campusId) params.append('campusId', campusId);
+
+        const stats = await backendFetch<CareerStats[]>(
+          `/api/v1/admin/statistics/by-career${params.toString() ? '?' + params.toString() : ''}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        ).catch((error: any) => {
+          logger.error('route:admin-export-pdf', 'Error al obtener estadísticas', {
+            error: error.message,
+            status: error.status
+          });
+          throw error;
+        });
+
+        // Personalizar nombre de archivo según filtros
+        let filenameParts = ['estadisticas', year];
+        if (institutionId) filenameParts.push('institucion');
+        if (campusId) filenameParts.push('campus');
+        filename = `${filenameParts.join('_')}.pdf`;
+
+        htmlContent = generateStatisticsHTML(stats, year, institutionName, campusName);
+      }
+    } catch (fetchError: any) {
+      logger.error('route:admin-export-pdf', 'Error al obtener datos del backend', { 
+        error: fetchError.message,
+        status: fetchError.status 
+      });
+      
+      // Si es un error 401/403, retornar error de autenticación
+      if (fetchError.status === 401 || fetchError.status === 403) {
+        return NextResponse.json(
+          { error: 'Unauthorized', message: 'No tienes permisos para acceder a este recurso' },
+          { status: 401 }
+        );
+      }
+      
+      throw fetchError;
+    }
+
+    // Retornar HTML optimizado para impresión/PDF
+    // El navegador puede convertir HTML a PDF usando "Imprimir" -> "Guardar como PDF"
+    // Agregar script para auto-imprimir y mejorar la experiencia
+    const htmlWithAutoPrint = htmlContent.replace(
+      '</body>',
+      `
+  <script>
+    // Auto-imprimir cuando se carga la página (opcional, comentado por defecto)
+    // window.onload = function() {
+    //   setTimeout(() => window.print(), 500);
+    // };
+    
+    // Mejorar la experiencia de impresión
+    window.onbeforeprint = function() {
+      document.title = '${filename.replace('.pdf', '')}';
+    };
+    
+    // Manejar errores de impresión
+    window.onafterprint = function() {
+      // Opcional: cerrar ventana después de imprimir
+      // window.close();
+    };
+  </script>
+</body>`
+    );
+    
+    const encodedFilename = encodeURIComponent(filename.replace('.pdf', ''));
+    
+    return new NextResponse(htmlWithAutoPrint, {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        // 'Content-Disposition': `attachment; filename="${filename}"`, // Para cuando se implemente PDF real
+        'Content-Disposition': `inline; filename="${encodedFilename}.html"`,
+        // Headers adicionales para mejor compatibilidad
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error al exportar PDF';
     const errorStatus = (error as { status?: number })?.status || 500;
-    logger.error('route:admin-export-pdf', 'error', { error: errorMessage });
+    logger.error('route:admin-export-pdf', 'error', { error: errorMessage, status: errorStatus });
     return NextResponse.json(
       { error: errorMessage },
       { status: errorStatus }
@@ -100,13 +241,19 @@ export async function GET(req: NextRequest) {
   }
 }
 
-function generateDashboardHTML(data: DashboardOverview): string {
+function generateDashboardHTML(data: DashboardOverview, institutionName?: string, campusName?: string): string {
+  // Construir título de filtros aplicados
+  const filterInfo = [];
+  if (institutionName) filterInfo.push(`Institución: ${institutionName}`);
+  if (campusName) filterInfo.push(`Campus: ${campusName}`);
+  const filterText = filterInfo.length > 0 ? ` - ${filterInfo.join(' - ')}` : '';
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Reporte Dashboard - EcoEstudiante</title>
+  <title>Reporte Dashboard - EcoEstudiante${filterText}</title>
   <style>
     @media print {
       @page {
@@ -300,6 +447,7 @@ function generateDashboardHTML(data: DashboardOverview): string {
     <div class="header-content">
       <h1>🌱 EcoEstudiante</h1>
       <p class="subtitle">Reporte del Dashboard Administrativo</p>
+      ${filterText ? `<p style="color: #059669; font-weight: 600; margin-top: 8px;">📍 ${filterInfo.join(' • ')}</p>` : ''}
       <p>📅 Generado: ${new Date().toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long',

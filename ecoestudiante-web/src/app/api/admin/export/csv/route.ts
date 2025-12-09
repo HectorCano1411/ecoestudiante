@@ -32,10 +32,24 @@ function toRecord(obj: StudentRow | StatsRow): Record<string, unknown> {
 
 export async function GET(req: NextRequest) {
   try {
+    // Obtener token de autenticación
     const { token, type } = await getAuthToken(req);
-    if (!token) {
+    
+    // Si no hay token en el header, intentar obtenerlo de los query params (para descargas directas)
+    let authToken = token;
+    if (!authToken) {
+      const searchParams = req.nextUrl.searchParams;
+      const tokenParam = searchParams.get('token');
+      if (tokenParam) {
+        authToken = tokenParam;
+        logger.info('route:admin-export-csv', 'Token obtenido de query params');
+      }
+    }
+
+    if (!authToken) {
+      logger.warn('route:admin-export-csv', 'No se encontró token de autenticación');
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized', message: 'Token de autenticación requerido' },
         { status: 401 }
       );
     }
@@ -43,42 +57,86 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const typeParam = searchParams.get('type') || 'students';
     const career = searchParams.get('career') || undefined;
+    const year = searchParams.get('year') || new Date().getFullYear().toString();
+    const institutionId = searchParams.get('institutionId') || undefined;
+    const campusId = searchParams.get('campusId') || undefined;
 
-    logger.info('route:admin-export-csv', 'income', { type: typeParam, career, authType: type });
+    logger.info('route:admin-export-csv', 'income', {
+      type: typeParam,
+      career,
+      year,
+      institutionId,
+      campusId,
+      authType: type,
+      hasToken: !!authToken
+    });
 
     type RowData = StudentRow | StatsRow;
     let data: RowData[] = [];
     let filename = 'export.csv';
 
     if (typeParam === 'students') {
-      // Obtener todos los estudiantes
+      // Obtener todos los estudiantes con filtros
       interface StudentsResponse {
         students: StudentRow[];
         total: number;
         page: number;
         pageSize: number;
       }
-      const response = await backendFetch<StudentsResponse>('/api/v1/admin/students?page=1&pageSize=10000', {
+
+      // Construir query params con filtros
+      const params = new URLSearchParams({
+        page: '1',
+        pageSize: '10000'
+      });
+      if (career) params.append('career', career);
+      if (institutionId) params.append('institutionId', institutionId);
+      if (campusId) params.append('campusId', campusId);
+
+      const response = await backendFetch<StudentsResponse>(`/api/v1/admin/students?${params.toString()}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
         },
       });
 
       data = response.students || [];
-      filename = 'estudiantes.csv';
+
+      // Personalizar nombre de archivo según filtros
+      let filenameParts = ['estudiantes'];
+      if (institutionId) filenameParts.push('institucion');
+      if (campusId) filenameParts.push('campus');
+      if (career) filenameParts.push(career.toLowerCase().replace(/\s+/g, '_'));
+      filename = `${filenameParts.join('_')}_${new Date().toISOString().split('T')[0]}.csv`;
+
     } else if (typeParam === 'statistics') {
-      const stats = await backendFetch<StatsRow[]>('/api/v1/admin/statistics/by-career' + (career ? `?career=${career}` : ''), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Construir query params con filtros
+      const params = new URLSearchParams();
+      if (career) params.append('career', career);
+      if (year) params.append('year', year);
+      if (institutionId) params.append('institutionId', institutionId);
+      if (campusId) params.append('campusId', campusId);
+
+      const stats = await backendFetch<StatsRow[]>(
+        `/api/v1/admin/statistics/by-career${params.toString() ? '?' + params.toString() : ''}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       data = stats || [];
-      filename = 'estadisticas.csv';
+
+      // Personalizar nombre de archivo según filtros
+      let filenameParts = ['estadisticas', year];
+      if (institutionId) filenameParts.push('institucion');
+      if (campusId) filenameParts.push('campus');
+      if (career) filenameParts.push(career.toLowerCase().replace(/\s+/g, '_'));
+      filename = `${filenameParts.join('_')}.csv`;
     }
 
     // Convertir a CSV
@@ -126,6 +184,10 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+
+
+
 
 
 

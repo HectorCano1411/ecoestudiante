@@ -1,4 +1,4 @@
-# 🌱 EcoEstudiante
+    # 🌱 EcoEstudiante
 
 <div align="center">
 
@@ -1763,3 +1763,33 @@ Para preguntas, sugerencias o soporte:
 🌱 **EcoEstudiante** - Calculando el cambio, un estudiante a la vez
 
 </div>
+
+## Tabla de Costos de Infraestructura AWS – EcoEstudiante
+
+| Servicio AWS                         | Costo Mensual (USD) | Costo Anual (USD) |
+|-------------------------------------|----------------------|--------------------|
+| Amazon EC2 (2 × t3.medium)          | 102.67              | 1,232.04           |
+| Amazon EKS (Control Plane)          | 73.00               | 876.00             |
+| Amazon RDS PostgreSQL (db.t4g.micro)| 31.39               | 376.68             |
+| Application Load Balancer (ALB)     | 25.62               | 307.44             |
+| AWS Data Transfer (50 GB / mes)     | 15.00               | 180.00             |
+| Amazon CloudWatch (métricas + logs) | 19.53               | 234.36             |
+| Amazon S3 (storage + requests)      | 1.00 *(estimado)*   | 12.00              |
+| AWS Secrets Manager (5 secretos)    | 2.05                | 24.60              |
+| **Total Infraestructura AWS**       | **270.26 USD/mes**  | **3,242.12 USD/año** |
+
+> *Nota:* Todos los valores fueron calculados para la región **South America (São Paulo – sa-east-1)** utilizando **AWS Pricing Calculator**, con una proyección de uso de 730 horas mensuales.
+
+
+La estimación de costos realizada mediante AWS Pricing Calculator evidencia que la plataforma EcoEstudiante puede operar de manera sustentable sobre una arquitectura cloud de nivel enterprise, con un costo mensual aproximado de **270 USD** (equivalente a **3,242 USD anuales**). Este monto es consistente con soluciones de clase institucional que emplean servicios administrados para asegurar disponibilidad, escalabilidad y seguridad.
+
+Los costos se distribuyen principalmente en los servicios críticos de operación: cómputo (EC2), orquestación de contenedores (Amazon EKS) y la base de datos administrada (Amazon RDS). La capa de acceso y red, compuesta por un Application Load Balancer y transferencia de datos hacia Internet, representa un componente relevante pero estable. Servicios complementarios como Amazon S3, CloudWatch y AWS Secrets Manager mantienen costos bajos, aportando almacenamiento seguro, observabilidad y gestión de secretos conforme a buenas prácticas de seguridad.
+
+Desde una perspectiva económica, la inversión es proporcional a los beneficios funcionales que la plataforma entrega: medición precisa de la huella de carbono estudiantil, analítica ambiental en tiempo real, reportabilidad institucional y un ecosistema escalable capaz de soportar crecimiento futuro. Asimismo, el uso intensivo de tecnologías open source (Spring Boot, Next.js, PostgreSQL, Kubernetes) reduce el gasto en licencias y permite concentrar la inversión exclusivamente en infraestructura.
+
+En conclusión, la solución EcoEstudiante presenta una **alta factibilidad económica**, dado que su costo de operación en AWS es razonable, predecible y coherente con la naturaleza del proyecto y las necesidades institucionales. Esta infraestructura habilita un entorno seguro, escalable y de bajo mantenimiento, adecuado tanto para un despliegue piloto como para su evolución hacia una plataforma institucional de mayor alcance.
+
+
+
+
+

@@ -2,16 +2,20 @@ package com.ecoestudiante.calc.service;
 
 import com.ecoestudiante.auth.TokenUtil;
 import com.ecoestudiante.calc.dto.CalcDtos;
+import com.ecoestudiante.gamification.event.CalculationCompletedEvent;
 import com.ecoestudiante.gamification.service.GamificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.Map;
 import java.util.UUID;
@@ -24,11 +28,13 @@ public class CalcServiceImpl implements CalcService {
   private final JdbcTemplate jdbc;
   private final TokenUtil tokenUtil;
   private final GamificationService gamificationService;
+  private final ApplicationEventPublisher eventPublisher;
 
-  public CalcServiceImpl(JdbcTemplate jdbc, TokenUtil tokenUtil, GamificationService gamificationService) {
+  public CalcServiceImpl(JdbcTemplate jdbc, TokenUtil tokenUtil, GamificationService gamificationService, ApplicationEventPublisher eventPublisher) {
     this.jdbc = jdbc;
     this.tokenUtil = tokenUtil;
     this.gamificationService = gamificationService;
+    this.eventPublisher = eventPublisher;
   }
 
   /**
@@ -55,6 +61,7 @@ public class CalcServiceImpl implements CalcService {
   }
 
   @Override
+  @Transactional
   public CalcDtos.CalcResult computeElectricity(CalcDtos.ElectricityInput in) {
     // Validación de entrada
     if (in.userId() == null || in.userId().isBlank()) {
@@ -188,6 +195,24 @@ public class CalcServiceImpl implements CalcService {
         // No fallar el cálculo si falla la gamificación
       }
 
+      // Publicar evento de cálculo completado para actualizar misiones automáticamente
+      try {
+        CalculationCompletedEvent event = new CalculationCompletedEvent(
+                this,
+                tokenUtil.normalizeUserIdToUuid(in.userId()),
+                calcId.toString(),
+                "electricidad",
+                BigDecimal.valueOf(kg),
+                inputMap,
+                LocalDateTime.now()
+        );
+        eventPublisher.publishEvent(event);
+        logger.info("🎯 Evento CalculationCompleted publicado para cálculo de electricidad - userId: {}, category: electricidad", in.userId());
+      } catch (Exception e) {
+        logger.error("❌ Error publicando evento de cálculo completado - userId: {}", in.userId(), e);
+        // No fallar el cálculo si falla la publicación del evento
+      }
+
       return new CalcDtos.CalcResult(calcId.toString(), kg, factorHash);
 
     } catch (DataIntegrityViolationException dup) {
@@ -218,6 +243,7 @@ public class CalcServiceImpl implements CalcService {
   }
 
   @Override
+  @Transactional
   public CalcDtos.CalcResult computeTransport(CalcDtos.TransportInput in) {
     // 1) Idempotencia: si ya existe, devolvemos el mismo calcId y resultado
     var exist = jdbc.query("""
@@ -410,6 +436,24 @@ public class CalcServiceImpl implements CalcService {
         // No fallar el cálculo si falla la gamificación
       }
 
+      // Publicar evento de cálculo completado para actualizar misiones automáticamente
+      try {
+        CalculationCompletedEvent event = new CalculationCompletedEvent(
+                this,
+                tokenUtil.normalizeUserIdToUuid(in.userId()),
+                calcId.toString(),
+                "transporte",
+                BigDecimal.valueOf(kg),
+                inputMap,
+                LocalDateTime.now()
+        );
+        eventPublisher.publishEvent(event);
+        logger.info("🎯 Evento CalculationCompleted publicado para cálculo de transporte - userId: {}, category: transporte", in.userId());
+      } catch (Exception e) {
+        logger.error("❌ Error publicando evento de cálculo completado - userId: {}", in.userId(), e);
+        // No fallar el cálculo si falla la publicación del evento
+      }
+
       return new CalcDtos.CalcResult(calcId.toString(), kg, factorHash);
 
     } catch (DataIntegrityViolationException dup) {
@@ -440,6 +484,7 @@ public class CalcServiceImpl implements CalcService {
   }
 
   @Override
+  @Transactional
   public CalcDtos.CalcResult computeWaste(CalcDtos.WasteInput in) {
     // Validación de entrada
     if (in.userId() == null || in.userId().isBlank()) {
@@ -629,6 +674,24 @@ public class CalcServiceImpl implements CalcService {
       } catch (Exception e) {
         logger.warn("Error otorgando XP para cálculo de residuos - userId: {}", in.userId(), e);
         // No fallar el cálculo si falla la gamificación
+      }
+
+      // Publicar evento de cálculo completado para actualizar misiones automáticamente
+      try {
+        CalculationCompletedEvent event = new CalculationCompletedEvent(
+                this,
+                tokenUtil.normalizeUserIdToUuid(in.userId()),
+                calcId.toString(),
+                "residuos",
+                BigDecimal.valueOf(totalKg),
+                inputMap,
+                LocalDateTime.now()
+        );
+        eventPublisher.publishEvent(event);
+        logger.info("🎯 Evento CalculationCompleted publicado para cálculo de residuos - userId: {}, category: residuos", in.userId());
+      } catch (Exception e) {
+        logger.error("❌ Error publicando evento de cálculo completado - userId: {}", in.userId(), e);
+        // No fallar el cálculo si falla la publicación del evento
       }
 
       return new CalcDtos.CalcResult(calcId.toString(), totalKg, combinedHash);

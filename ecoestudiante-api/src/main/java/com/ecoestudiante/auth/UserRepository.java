@@ -21,7 +21,8 @@ public class UserRepository {
         String sql = """
             SELECT id, username, email, password_hash, enabled, carrera, jornada,
                    email_verified, verification_token, verification_token_expiry,
-                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
             FROM app_user
             WHERE username = ?
             """;
@@ -37,7 +38,8 @@ public class UserRepository {
         String sql = """
             SELECT id, username, email, password_hash, enabled, carrera, jornada,
                    email_verified, verification_token, verification_token_expiry,
-                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
             FROM app_user
             WHERE email = ?
             """;
@@ -53,7 +55,8 @@ public class UserRepository {
         String sql = """
             SELECT id, username, email, password_hash, enabled, carrera, jornada,
                    email_verified, verification_token, verification_token_expiry,
-                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
             FROM app_user
             WHERE google_id = ?
             """;
@@ -69,7 +72,8 @@ public class UserRepository {
         String sql = """
             SELECT id, username, email, password_hash, enabled, carrera, jornada,
                    email_verified, verification_token, verification_token_expiry,
-                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
             FROM app_user
             WHERE verification_token = ? AND verification_token_expiry > now()
             """;
@@ -85,7 +89,8 @@ public class UserRepository {
         String sql = """
             SELECT id, username, email, password_hash, enabled, carrera, jornada,
                    email_verified, verification_token, verification_token_expiry,
-                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
             FROM app_user
             WHERE verification_token = ?
             """;
@@ -101,7 +106,8 @@ public class UserRepository {
         String sql = """
             SELECT id, username, email, password_hash, enabled, carrera, jornada,
                    email_verified, verification_token, verification_token_expiry,
-                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
             FROM app_user
             WHERE reset_token = ?
             """;
@@ -113,6 +119,41 @@ public class UserRepository {
         }
     }
 
+    public Optional<AppUser> findById(UUID id) {
+        String sql = """
+            SELECT id, username, email, password_hash, enabled, carrera, jornada,
+                   email_verified, verification_token, verification_token_expiry,
+                   reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                   institution_id, campus_id
+            FROM app_user
+            WHERE id = ?
+            """;
+        try {
+            // Intentar primero con UUID directo (como en save() UPDATE)
+            AppUser user = jdbc.queryForObject(sql, userRowMapper(), id);
+            return Optional.ofNullable(user);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            // Si no se encuentra, retornar empty
+            return Optional.empty();
+        } catch (Exception e) {
+            // Si hay otro error (por ejemplo, problema de tipo), intentar con string
+            try {
+                String sqlString = """
+                    SELECT id, username, email, password_hash, enabled, carrera, jornada,
+                           email_verified, verification_token, verification_token_expiry,
+                           reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                           institution_id, campus_id
+                    FROM app_user
+                    WHERE id::text = ?
+                    """;
+                AppUser user = jdbc.queryForObject(sqlString, userRowMapper(), id.toString());
+                return Optional.ofNullable(user);
+            } catch (Exception e2) {
+                return Optional.empty();
+            }
+        }
+    }
+
     public AppUser save(AppUser user) {
         if (user.getId() == null) {
             // Insert
@@ -120,8 +161,9 @@ public class UserRepository {
             String sql = """
                 INSERT INTO app_user (id, username, email, password_hash, enabled, carrera, jornada, 
                                       email_verified, verification_token, verification_token_expiry,
-                                      reset_token, reset_token_expiry, google_id, auth_provider, picture_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                      reset_token, reset_token_expiry, google_id, auth_provider, picture_url, role,
+                                      institution_id, campus_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
             jdbc.update(sql, 
                 id, 
@@ -138,7 +180,10 @@ public class UserRepository {
                 user.getResetTokenExpiry() != null ? Timestamp.valueOf(user.getResetTokenExpiry()) : null,
                 user.getGoogleId(),
                 user.getAuthProvider() != null ? user.getAuthProvider() : "local",
-                user.getPictureUrl()
+                user.getPictureUrl(),
+                user.getRole() != null ? user.getRole() : "ESTUDIANTE",
+                user.getInstitutionId(),
+                user.getCampusId()
             );
             return findByUsername(user.getUsername()).orElseThrow();
         } else {
@@ -148,7 +193,7 @@ public class UserRepository {
                 SET username = ?, email = ?, password_hash = ?, enabled = ?, carrera = ?, jornada = ?,
                     email_verified = ?, verification_token = ?, verification_token_expiry = ?,
                     reset_token = ?, reset_token_expiry = ?, google_id = ?, auth_provider = ?, 
-                    picture_url = ?, updated_at = now()
+                    picture_url = ?, role = ?, institution_id = ?, campus_id = ?, updated_at = now()
                 WHERE id = ?
                 """;
             jdbc.update(sql, 
@@ -166,6 +211,9 @@ public class UserRepository {
                 user.getGoogleId(),
                 user.getAuthProvider() != null ? user.getAuthProvider() : "local",
                 user.getPictureUrl(),
+                user.getRole() != null ? user.getRole() : "ESTUDIANTE",
+                user.getInstitutionId(),
+                user.getCampusId(),
                 user.getId()
             );
             return findByUsername(user.getUsername()).orElseThrow();
@@ -222,11 +270,23 @@ public class UserRepository {
                 user.setPictureUrl(rs.getString("picture_url"));
             }
 
-            // Mapear el campo role
+            // Mapear el campo role (normalizar a mayúsculas para consistencia)
             if (rs.getString("role") != null) {
-                user.setRole(rs.getString("role"));
+                String role = rs.getString("role").toUpperCase().trim();
+                user.setRole(role);
             } else {
-                user.setRole("STUDENT");  // Rol por defecto si no existe
+                user.setRole("ESTUDIANTE");  // Rol por defecto si no existe
+            }
+
+            // Mapear institution_id y campus_id
+            String institutionIdStr = rs.getString("institution_id");
+            if (institutionIdStr != null) {
+                user.setInstitutionId(UUID.fromString(institutionIdStr));
+            }
+
+            String campusIdStr = rs.getString("campus_id");
+            if (campusIdStr != null) {
+                user.setCampusId(UUID.fromString(campusIdStr));
             }
 
             return user;

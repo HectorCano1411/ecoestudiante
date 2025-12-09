@@ -138,10 +138,15 @@ export default function CategoryPieChart({
           },
           label: {
             show: true,
-            formatter: () => {
-              return `{b}\n{d}%`;
+            // Professional formatter: shows category name and percentage with actual values
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            formatter: (params: any) => {
+              const percentage = params.percent.toFixed(1);
+              return `${params.name}\n${percentage}%`;
             },
             fontSize: 12,
+            fontWeight: 600,
+            color: '#334155', // slate-700 for better readability
           },
           labelLine: {
             show: true,

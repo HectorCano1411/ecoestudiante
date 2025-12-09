@@ -65,6 +65,31 @@ spring:
           metadata:
             service-name: admin-service  # Para trazas OpenTelemetry (Fase 3)
         
+        # Servicio de Instituciones Educativas
+        # Ruta: /api/v1/institutions/**
+        # Incluye: gestión de instituciones y campus (CRUD completo)
+        # NOTA: NO usar StripPrefix - el backend espera la ruta completa /api/v1/institutions/**
+        # Acceso público permitido para GET (el backend verifica permisos según parámetros)
+        # POST/PUT/DELETE requieren rol ADMIN, SUPER_ADMIN o PROFESOR (verificado por @PreAuthorize)
+        - id: institutions-service
+          uri: ${BACKEND_API_URL:http://localhost:18080}
+          predicates:
+            - Path=/api/v1/institutions/**
+          metadata:
+            service-name: institutions-service  # Para trazas OpenTelemetry (Fase 3)
+
+        # Servicio de Gestión de Usuarios
+        # Ruta: /api/v1/users/**
+        # Incluye: CRUD de usuarios, gestión de roles (SUPER_ADMIN, ADMIN, PROFESOR, ESTUDIANTE)
+        # NOTA: NO usar StripPrefix - el backend espera la ruta completa /api/v1/users/**
+        # Requiere rol ADMIN o SUPER_ADMIN (verificado por @PreAuthorize en UserController)
+        - id: user-management-service
+          uri: ${BACKEND_API_URL:http://localhost:18080}
+          predicates:
+            - Path=/api/v1/users/**
+          metadata:
+            service-name: user-management-service  # Para trazas OpenTelemetry (Fase 3)
+        
         # Rutas legacy para compatibilidad temporal (DEPRECATED - eliminar en futura versión)
         # Mantener durante transición para no romper frontend existente
         - id: calculo-route-legacy

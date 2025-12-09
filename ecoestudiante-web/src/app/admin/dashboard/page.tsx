@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api-client';
 import Link from 'next/link';
 
@@ -50,23 +51,68 @@ interface DashboardOverview {
 }
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Verificar autenticación antes de cargar datos
+    const authToken = localStorage.getItem('authToken');
+    const userRole = localStorage.getItem('userRole');
+
+    console.log('[Dashboard] Verificando autenticación:', {
+      hasToken: !!authToken,
+      tokenLength: authToken?.length,
+      role: userRole
+    });
+
+    if (!authToken) {
+      console.error('[Dashboard] No hay token de autenticación, redirigiendo a login...');
+      window.location.href = '/admin/login';
+      return;
+    }
+
     loadDashboard();
   }, []);
+
+  async function handleLogout() {
+    try {
+      // Intentar llamar al endpoint de logout si existe
+      try {
+        await api('/auth/logout', { method: 'POST' });
+      } catch (e) {
+        // Si no existe el endpoint, continuar con la limpieza local
+        console.log('Endpoint de logout no disponible, limpiando sesión localmente');
+      }
+
+      // Limpiar todos los datos de autenticación del localStorage
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('isAdmin');
+
+      // Redirigir al login de administrador
+      router.push('/admin/login');
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      // Aún así, limpiar localStorage y redirigir
+      localStorage.clear();
+      router.push('/admin/login');
+    }
+  }
 
   async function loadDashboard() {
     try {
       setLoading(true);
       setError(null);
       
-      // Verificar que el usuario tenga rol de admin antes de hacer la petición
+      // Verificar que el usuario tenga rol de admin, super admin o profesor antes de hacer la petición
       const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
-      if (userRole !== 'ADMIN') {
-        setError('No tienes permisos de administrador. Por favor, inicia sesión como administrador.');
+      if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN' && userRole !== 'PROFESOR') {
+        setError('No tienes permisos de administrador. Por favor, inicia sesión con un rol autorizado.');
         setLoading(false);
         return;
       }
@@ -96,8 +142,31 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
+              <nav className="flex space-x-4 items-center">
+                <Link href="/admin/dashboard" className="text-blue-600 font-medium">Dashboard</Link>
+                <Link href="/admin/users" className="text-gray-600 hover:text-gray-900">Usuarios</Link>
+                <Link href="/admin/students" className="text-gray-600 hover:text-gray-900">Estudiantes</Link>
+                <Link href="/admin/statistics" className="text-gray-600 hover:text-gray-900">Estadísticas</Link>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 ml-4"
+                  title="Cerrar sesión"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Cerrar Sesión
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto p-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/4"></div>
             <div className="grid grid-cols-4 gap-4">
@@ -115,8 +184,25 @@ export default function AdminDashboardPage() {
     const isPermissionError = error.includes('permisos') || error.includes('No tienes');
     
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                title="Cerrar sesión"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto p-8">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <div className="flex items-start">
               <svg className="w-6 h-6 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -166,20 +252,50 @@ export default function AdminDashboardPage() {
             <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
             <nav className="flex space-x-4 items-center">
               <Link href="/admin/dashboard" className="text-blue-600 font-medium">Dashboard</Link>
+              <Link href="/admin/users" className="text-gray-600 hover:text-gray-900">Usuarios</Link>
+              <Link href="/admin/institutions" className="text-gray-600 hover:text-gray-900">Instituciones</Link>
               <Link href="/admin/students" className="text-gray-600 hover:text-gray-900">Estudiantes</Link>
               <Link href="/admin/statistics" className="text-gray-600 hover:text-gray-900">Estadísticas</Link>
-              {data && (
-                <div className="flex space-x-2 ml-4">
-                  <a
-                    href="/api/admin/export/pdf?type=dashboard"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+              <div className="flex space-x-2 ml-4">
+                {data && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('authToken');
+                        if (!token) {
+                          alert('No estás autenticado. Por favor, inicia sesión.');
+                          return;
+                        }
+
+                        // Crear URL con token
+                        const url = `/api/admin/export/pdf?type=dashboard&token=${encodeURIComponent(token)}`;
+                        
+                        // Abrir en nueva ventana para descargar
+                        const newWindow = window.open(url, '_blank');
+                        if (!newWindow) {
+                          alert('Por favor, permite ventanas emergentes para descargar el PDF');
+                        }
+                      } catch (error) {
+                        console.error('Error al exportar PDF:', error);
+                        alert('Error al exportar PDF. Por favor, intenta nuevamente.');
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
                   >
                     Exportar PDF
-                  </a>
-                </div>
-              )}
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  title="Cerrar sesión"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Cerrar Sesión
+                </button>
+              </div>
             </nav>
           </div>
         </div>

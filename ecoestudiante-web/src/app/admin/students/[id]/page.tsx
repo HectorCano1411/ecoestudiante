@@ -53,10 +53,16 @@ export default function StudentDetailPage() {
     if (!studentId) return;
     try {
       setLoading(true);
-      const response = await api<StudentDetail>(`/v1/admin/students/${studentId}`);
+      // Usar la ruta de Next.js API que hace proxy al backend
+      const response = await api<StudentDetail>(`/admin/students/${studentId}`);
       setData(response);
     } catch (e) {
       console.error('Error loading student detail:', e);
+      // Si es un error 404, el estudiante no existe
+      const error = e as { status?: number; message?: string };
+      if (error.status === 404) {
+        setData(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -78,14 +84,65 @@ export default function StudentDetailPage() {
     );
   }
 
-  if (!data) {
+  if (!data && !loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <p className="text-red-600">Estudiante no encontrado</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold text-gray-900">Detalle del Estudiante</h1>
+              <nav className="flex space-x-4">
+                <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
+                <Link href="/admin/students" className="text-blue-600 font-medium">Estudiantes</Link>
+              </nav>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-6">
+            <button
+              onClick={() => router.back()}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Volver
+            </button>
+          </div>
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="flex flex-col items-center">
+              <svg className="w-16 h-16 text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Estudiante no encontrado</h2>
+              <p className="text-gray-600 mb-6">
+                No se encontró un estudiante con el ID: <code className="bg-gray-100 px-2 py-1 rounded text-sm">{studentId}</code>
+              </p>
+              <div className="flex gap-3">
+                <Link
+                  href="/admin/students"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Volver a Estudiantes
+                </Link>
+                <Link
+                  href="/admin/dashboard"
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Ir al Dashboard
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
+  }
+
+  // TypeScript guard - data cannot be null here
+  if (!data) {
+    return null;
   }
 
   return (
@@ -227,6 +284,10 @@ export default function StudentDetailPage() {
     </div>
   );
 }
+
+
+
+
 
 
 

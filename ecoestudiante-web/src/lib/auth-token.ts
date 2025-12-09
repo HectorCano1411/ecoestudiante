@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from 'next/server';
-import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
+// import { getSession, getAccessToken } from '@auth0/nextjs-auth0'; // DESHABILITADO: Incompatible con Next.js 15
 import { logger } from '@/lib/logger';
 
 /**
@@ -31,10 +31,19 @@ export async function getAuthToken(req: NextRequest): Promise<{
                        req.headers.get('Authorization') ||
                        req.headers.get('AUTHORIZATION');
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    logger.debug('auth-token', 'Checking for token in headers', {
+      hasAuthHeader: !!authHeader,
+      authHeaderLength: authHeader?.length,
+      authHeaderPrefix: authHeader?.substring(0, 20),
+    });
+
+    if (authHeader && (authHeader.startsWith('Bearer ') || authHeader.startsWith('bearer '))) {
       const jwtToken = authHeader.replace(/^Bearer /i, '').trim();
-      if (jwtToken) {
-        logger.debug('auth-token', 'Token JWT tradicional encontrado en header');
+      if (jwtToken && jwtToken.length > 0) {
+        logger.debug('auth-token', 'Token JWT tradicional encontrado en header', {
+          tokenLength: jwtToken.length,
+          tokenPrefix: jwtToken.substring(0, 20) + '...',
+        });
 
         // Extraer userId del JWT (sin verificar firma, solo para logging)
         const userId = extractUserIdFromJwt(jwtToken);
@@ -44,13 +53,23 @@ export async function getAuthToken(req: NextRequest): Promise<{
           type: 'jwt',
           userId: userId || undefined
         };
+      } else {
+        logger.warn('auth-token', 'Header Authorization encontrado pero token vacío después de procesar');
       }
+    } else if (authHeader) {
+      logger.warn('auth-token', 'Header Authorization encontrado pero no empieza con Bearer', {
+        headerPrefix: authHeader.substring(0, 20),
+      });
     }
 
     // ========================================================================
-    // OPCIÓN 2: Token de Auth0 (solo si está configurado)
+    // OPCIÓN 2: Token de Auth0 (DESHABILITADO TEMPORALMENTE)
     // ========================================================================
-    // Este método funciona para usuarios que hicieron login con Auth0
+    // NOTA: Auth0 está deshabilitado temporalmente debido a incompatibilidad
+    // con Next.js 15 (cookies() asíncrono). Si necesitas Auth0, actualiza
+    // @auth0/nextjs-auth0 a la versión 4.0.0+ que soporte Next.js 15.
+    // Por ahora, solo usamos JWT tradicional del header.
+    
     const isAuth0Enabled = Boolean(
       process.env.AUTH0_SECRET &&
       process.env.AUTH0_CLIENT_ID &&
@@ -59,76 +78,60 @@ export async function getAuthToken(req: NextRequest): Promise<{
     );
 
     if (isAuth0Enabled) {
+      logger.debug('auth-token', 'Auth0 está configurado pero deshabilitado temporalmente (Next.js 15 compatibility)');
+    } else {
+      logger.debug('auth-token', 'Auth0 no está configurado, usando solo JWT tradicional');
+    }
+
+    /*
+    // CÓDIGO DE Auth0 DESHABILITADO TEMPORALMENTE
+    // Descomenta cuando @auth0/nextjs-auth0 soporte Next.js 15 completamente
+    if (isAuth0Enabled) {
       try {
-        // ESTRATEGIA 1: Intentar getAccessToken() primero (método más confiable)
-        // Este método está específicamente diseñado para obtener access tokens
-        logger.debug('auth-token', '🔍 Intentando obtener token Auth0 con getAccessToken()...');
-
-        try {
-          const tokenResult = await getAccessToken();
-          if (tokenResult && tokenResult.accessToken) {
-            logger.info('auth-token', '✅ Token Auth0 obtenido exitosamente desde getAccessToken()', {
-              tokenLength: tokenResult.accessToken.length,
-              hasToken: true
-            });
-
-            const userId = extractUserIdFromJwt(tokenResult.accessToken);
-            return {
-              token: tokenResult.accessToken,
-              type: 'auth0',
-              userId: userId || undefined
-            };
-          } else {
-            logger.debug('auth-token', '⚠️ getAccessToken() retornó resultado vacío');
-          }
-        } catch (accessTokenError: any) {
-          logger.debug('auth-token', '⚠️ getAccessToken() falló, intentando getSession()...', {
-            error: accessTokenError.message,
-            code: accessTokenError.code
+        // ESTRATEGIA 1: Intentar getAccessToken()
+        const tokenResult = await getAccessToken();
+        if (tokenResult && tokenResult.accessToken) {
+          logger.info('auth-token', '✅ Token Auth0 obtenido exitosamente', {
+            tokenLength: tokenResult.accessToken.length
           });
+
+          const userId = extractUserIdFromJwt(tokenResult.accessToken);
+          return {
+            token: tokenResult.accessToken,
+            type: 'auth0',
+            userId: userId || undefined
+          };
         }
+      } catch (accessTokenError: any) {
+        logger.debug('auth-token', '⚠️ getAccessToken() falló', {
+          error: accessTokenError.message
+        });
+      }
 
-        // ESTRATEGIA 2: Fallback a getSession() si getAccessToken() falla
-        // Algunas configuraciones pueden retornar el token en la sesión
+      // ESTRATEGIA 2: Fallback a getSession()
+      try {
         const session = await getSession();
-
         if (session && session.accessToken) {
-          logger.info('auth-token', '✅ Access token Auth0 obtenido desde session (fallback)', {
+          logger.info('auth-token', '✅ Access token Auth0 obtenido desde session', {
             hasSession: true,
             hasAccessToken: true,
             userId: session.user?.sub
           });
 
-          // Extraer userId del session.user.sub (más confiable que decodificar el token)
           const userId = session.user?.sub || extractUserIdFromJwt(session.accessToken);
-
           return {
             token: session.accessToken,
             type: 'auth0',
             userId: userId || undefined
           };
-        } else if (session && !session.accessToken) {
-          logger.warn('auth-token', '❌ Sesión Auth0 existe pero NO tiene accessToken', {
-            hasSession: true,
-            hasUser: !!session.user,
-            sessionKeys: Object.keys(session),
-            userId: session.user?.sub,
-            scope: process.env.AUTH0_SCOPE,
-            audience: process.env.AUTH0_AUDIENCE
-          });
-        } else {
-          logger.debug('auth-token', 'No hay sesión Auth0 activa');
         }
-      } catch (auth0Error: any) {
-        // No es un error crítico - simplemente no hay sesión de Auth0
+      } catch (sessionError: any) {
         logger.debug('auth-token', 'Error al obtener sesión de Auth0', {
-          error: auth0Error.message,
-          errorName: auth0Error.name
+          error: sessionError.message
         });
       }
-    } else {
-      logger.debug('auth-token', 'Auth0 no está configurado, usando solo JWT tradicional');
     }
+    */
 
     // ========================================================================
     // Sin token disponible

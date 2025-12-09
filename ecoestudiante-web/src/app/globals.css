@@ -218,7 +218,7 @@ li[aria-selected="true"] * {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* LABELS - Dark text with maximum contrast */
+/* LABELS - Dark text with maximum contrast + OUTSIDE PLACEMENT FIX */
 [data-slot="label"],
 .nextui-select-label,
 label[data-slot="label"] {
@@ -226,6 +226,98 @@ label[data-slot="label"] {
   font-weight: 700 !important;
   font-size: 14px !important;
   margin-bottom: 6px !important;
+}
+
+/* CRITICAL FIX: Label Centered INSIDE Container - Professional Senior Solution */
+.filter-dropdown-1 [data-slot="label"],
+.filter-dropdown-2 [data-slot="label"],
+.filter-dropdown-3 [data-slot="label"],
+.filter-dropdown-4 [data-slot="label"],
+.filter-dropdown-5 [data-slot="label"],
+.filter-dropdown-6 [data-slot="label"] {
+  display: block !important;
+  position: static !important; /* Static flow for proper containment */
+  width: calc(100% - 16px) !important; /* Full width minus margins to stay inside container */
+  max-width: calc(100% - 16px) !important; /* Prevent overflow beyond container edges */
+  margin-left: 8px !important; /* Left indent - creates visual containment from left edge */
+  margin-right: 8px !important; /* Right indent - creates visual containment from right edge */
+  margin-bottom: 8px !important; /* Space between label and trigger */
+  margin-top: 4px !important; /* Top space from container edge for balanced spacing */
+  padding: 0 8px !important; /* Inner padding for text spacing */
+  color: #334155 !important; /* slate-700 */
+  font-size: 0.875rem !important; /* 14px */
+  font-weight: 600 !important;
+  line-height: 1.25rem !important;
+  text-align: center !important; /* CENTER TEXT HORIZONTALLY - KEY FIX */
+  white-space: nowrap !important; /* Prevent line breaks */
+  overflow: hidden !important; /* Hide overflow */
+  text-overflow: ellipsis !important; /* Show ... if text is too long */
+  pointer-events: none !important; /* No interfiere con clicks */
+  box-sizing: border-box !important; /* Include padding in width calculation */
+}
+
+/* Trigger button - Asegurar que no contenga el label */
+.filter-dropdown-1 [data-slot="trigger"],
+.filter-dropdown-2 [data-slot="trigger"],
+.filter-dropdown-3 [data-slot="trigger"],
+.filter-dropdown-4 [data-slot="trigger"],
+.filter-dropdown-5 [data-slot="trigger"],
+.filter-dropdown-6 [data-slot="trigger"] {
+  position: relative !important;
+  z-index: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  margin: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* Main wrapper - Asegurar layout vertical y contención */
+.filter-dropdown-1,
+.filter-dropdown-2,
+.filter-dropdown-3,
+.filter-dropdown-4,
+.filter-dropdown-5,
+.filter-dropdown-6 {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important; /* Stretch children to full width */
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important; /* Allow dropdown to overflow, but not the label */
+  box-sizing: border-box !important;
+}
+
+/* NextUI Select base component - Ensure proper width containment */
+.filter-dropdown-1 [data-slot="base"],
+.filter-dropdown-2 [data-slot="base"],
+.filter-dropdown-3 [data-slot="base"],
+.filter-dropdown-4 [data-slot="base"],
+.filter-dropdown-5 [data-slot="base"],
+.filter-dropdown-6 [data-slot="base"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Inner wrapper - Ensure full width */
+.filter-dropdown-1 [data-slot="inner-wrapper"],
+.filter-dropdown-2 [data-slot="inner-wrapper"],
+.filter-dropdown-3 [data-slot="inner-wrapper"],
+.filter-dropdown-4 [data-slot="inner-wrapper"],
+.filter-dropdown-5 [data-slot="inner-wrapper"],
+.filter-dropdown-6 [data-slot="inner-wrapper"] {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 /* VALUE DISPLAY */
@@ -259,13 +351,24 @@ label[data-slot="label"] {
   background: #64748b !important;
 }
 
-/* Z-INDEX MANAGEMENT - Progressive to prevent overlap */
-.filter-dropdown-1 [data-slot="popover-content"] { z-index: 100 !important; }
-.filter-dropdown-2 [data-slot="popover-content"] { z-index: 90 !important; }
-.filter-dropdown-3 [data-slot="popover-content"] { z-index: 80 !important; }
-.filter-dropdown-4 [data-slot="popover-content"] { z-index: 70 !important; }
-.filter-dropdown-5 [data-slot="popover-content"] { z-index: 60 !important; }
-.filter-dropdown-6 [data-slot="popover-content"] { z-index: 50 !important; }
+/* Z-INDEX MANAGEMENT - CRECIENTE (ascending) to prevent overlap */
+/* Progressive z-index CRECIENTE para dropdowns (de top a bottom) */
+.filter-dropdown-1 [data-slot="popover-content"] { z-index: 1001 !important; }
+.filter-dropdown-2 [data-slot="popover-content"] { z-index: 1002 !important; }
+.filter-dropdown-3 [data-slot="popover-content"] { z-index: 1003 !important; }
+.filter-dropdown-4 [data-slot="popover-content"] { z-index: 1004 !important; }
+.filter-dropdown-5 [data-slot="popover-content"] { z-index: 1005 !important; }
+.filter-dropdown-6 [data-slot="popover-content"] { z-index: 1006 !important; }
+
+/* BOOST: Dropdown abierto siempre en el tope absoluto */
+.filter-dropdown-1 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-2 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-3 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-4 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-5 [data-open="true"] [data-slot="popover-content"],
+.filter-dropdown-6 [data-open="true"] [data-slot="popover-content"] {
+  z-index: 2000 !important; /* Máximo z-index cuando está abierto */
+}
 
 /* ANIMATIONS */
 @keyframes slideDownAndFade {

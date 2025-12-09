@@ -1473,7 +1473,7 @@ console.log("asdasdasdasdasd,",pieChartData )
         {/* Page Title */}
         <div className="mb-8 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
-            📊 Análisis de Huella de Carbono Hola
+            📊 Análisis de Huella de Carbono
           </h2>
           <p className="text-gray-700 font-medium">
             Visualiza y analiza tus registros de huella de carbono con gráficos dinámicos e interactivos
@@ -1483,7 +1483,7 @@ console.log("asdasdasdasdasd,",pieChartData )
         {/* Summary Cards */}
         <SummaryCards summary={summary} loading={loading} />
 
-        {/* Filters Panel */}
+        {/* Filters Panel - Actualización automática activada */}
         <FiltersPanel
           groupBy={groupBy}
           onGroupByChange={setGroupBy}
@@ -1498,7 +1498,6 @@ console.log("asdasdasdasdasd,",pieChartData )
           onMonthChange={setMonth}
           day={day}
           onDayChange={setDay}
-          onUpdate={loadAllData}
           onClear={() => {
             setSchedule('');
             setCareer('');
@@ -1506,6 +1505,7 @@ console.log("asdasdasdasdasd,",pieChartData )
             setDay('');
             setMonths(12);
             setGroupBy('month');
+            // Los gráficos se actualizarán automáticamente por el useEffect (líneas 807-863)
           }}
           loading={loadingData}
         />

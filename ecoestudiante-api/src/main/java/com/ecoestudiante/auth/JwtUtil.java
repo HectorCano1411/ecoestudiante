@@ -40,7 +40,11 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("type", "access");
-        claims.put("role", role != null ? role : "STUDENT"); // Default to STUDENT if no role
+        // Normalizar el rol a mayúsculas antes de guardarlo en el token
+        String normalizedRole = (role != null && !role.isBlank()) 
+            ? role.toUpperCase().trim().replaceAll("\\s+", "") 
+            : "ESTUDIANTE";
+        claims.put("role", normalizedRole);
         return createToken(claims, username, expiration);
     }
 
@@ -55,7 +59,11 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("type", "refresh");
-        claims.put("role", role != null ? role : "STUDENT");
+        // Normalizar el rol a mayúsculas antes de guardarlo en el token
+        String normalizedRole = (role != null && !role.isBlank()) 
+            ? role.toUpperCase().trim().replaceAll("\\s+", "") 
+            : "ESTUDIANTE";
+        claims.put("role", normalizedRole);
         return createToken(claims, username, refreshExpiration);
     }
 
@@ -78,7 +86,19 @@ public class JwtUtil {
     }
 
     public String extractRole(String token) {
-        return extractClaim(token, claims -> claims.get("role", String.class));
+        try {
+            String role = extractClaim(token, claims -> {
+                Object roleObj = claims.get("role");
+                if (roleObj == null) {
+                    return null;
+                }
+                // Convertir a String si es necesario
+                return roleObj.toString();
+            });
+            return role;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Date extractExpiration(String token) {

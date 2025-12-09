@@ -1,12 +1,14 @@
 package com.ecoestudiante.gamification.service;
 
 import com.ecoestudiante.gamification.dto.MissionDtos;
+import com.ecoestudiante.gamification.event.MissionAssignedEvent;
 import com.ecoestudiante.gamification.model.Mission;
 import com.ecoestudiante.gamification.model.MissionProgress;
 import com.ecoestudiante.gamification.repository.MissionProgressRepository;
 import com.ecoestudiante.gamification.repository.MissionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,12 +39,15 @@ public class MissionServiceImpl implements MissionService {
 
     private final MissionRepository missionRepository;
     private final MissionProgressRepository progressRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public MissionServiceImpl(
             MissionRepository missionRepository,
-            MissionProgressRepository progressRepository) {
+            MissionProgressRepository progressRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.missionRepository = missionRepository;
         this.progressRepository = progressRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -137,6 +142,23 @@ public class MissionServiceImpl implements MissionService {
         progress.setBaselineValue(request.baselineValue());
 
         progress = progressRepository.save(progress);
+
+        // Publicar evento de misión asignada para actualizar leaderboard inmediatamente
+        try {
+            MissionAssignedEvent event = new MissionAssignedEvent(
+                    this,
+                    userId,
+                    mission.getId(),
+                    mission.getWeekNumber(),
+                    mission.getYear(),
+                    LocalDateTime.now()
+            );
+            eventPublisher.publishEvent(event);
+            logger.debug("Evento MissionAssigned publicado para usuario {} y misión {}", userId, mission.getId());
+        } catch (Exception e) {
+            logger.warn("Error publicando evento de misión asignada - userId: {}, missionId: {}", userId, mission.getId(), e);
+            // No fallar la asignación si falla la publicación del evento
+        }
 
         return toMissionProgressResponse(progress, mission);
     }

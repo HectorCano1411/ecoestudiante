@@ -168,13 +168,34 @@ public class LeaderboardServiceImpl implements LeaderboardService {
 
     @Override
     public BigDecimal calculateCo2AvoidedForWeek(UUID userId, String weekNumber, Integer year) {
-        // TODO: Integrar con StatsService para obtener datos reales de emisiones
-        // Por ahora retorna un valor simulado basado en misiones completadas
+        logger.debug("Calculando CO2 evitado para usuario {} en semana {}-{}", userId, weekNumber, year);
 
-        int missionsCompleted = countMissionsCompletedInWeek(userId, weekNumber, year);
+        // Obtener rango de fechas de la semana
+        LocalDateTime[] weekRange = getWeekDateRange(weekNumber, year);
 
-        // Estimación: cada misión evita ~5kg CO₂ en promedio
-        return BigDecimal.valueOf(missionsCompleted * 5.0);
+        logger.debug("Rango de semana: {} a {}", weekRange[0], weekRange[1]);
+
+        // Sumar las emisiones de todos los cálculos de la semana
+        String query = """
+            SELECT COALESCE(SUM(result_kg_co2e), 0)
+            FROM calculation
+            WHERE user_id = ?::uuid
+              AND created_at >= ?
+              AND created_at < ?
+            """;
+
+        BigDecimal totalCo2 = jdbcTemplate.queryForObject(
+                query,
+                BigDecimal.class,
+                userId.toString(),
+                weekRange[0],
+                weekRange[1]
+        );
+
+        logger.info("📊 CO2 total calculado para usuario {} en semana {}-{}: {} kg",
+                userId, weekNumber, year, totalCo2);
+
+        return totalCo2 != null ? totalCo2 : BigDecimal.ZERO;
     }
 
     // =========================================================================
@@ -248,10 +269,10 @@ public class LeaderboardServiceImpl implements LeaderboardService {
     }
 
     private String getUsername(UUID userId) {
-        // Consultar username desde tabla users
+        // Consultar username desde tabla app_user
         try {
             return jdbcTemplate.queryForObject(
-                    "SELECT username FROM users WHERE id = ?",
+                    "SELECT username FROM app_user WHERE id = ?",
                     String.class,
                     userId
             );
