@@ -42,6 +42,7 @@ env.local
 # --- IDE ---
 .vscode/
 .idea/
+.claude/
 
 # --- SO/Misc ---
 .DS_Store
